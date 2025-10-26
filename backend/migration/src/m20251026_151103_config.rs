@@ -9,11 +9,10 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Post::Table)
+                    .table(Config::Table)
                     .if_not_exists()
-                    .col(pk_auto(Post::Id))
-                    .col(string(Post::Title))
-                    .col(string(Post::Text))
+                    .col(pk_uuid(Config::Id))
+                    .col(json_binary(Config::Config))
                     .to_owned(),
             )
             .await
@@ -21,15 +20,15 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Post::Table).to_owned())
+            .drop_table(Table::drop().table(Config::Table).to_owned())
             .await
     }
 }
 
 #[derive(DeriveIden)]
-enum Post {
+enum Config {
     Table,
     Id,
-    Title,
-    Text,
+    #[allow(clippy::enum_variant_names)]
+    Config,
 }

@@ -1,7 +1,4 @@
-use axum::{
-    response::Json,
-    extract::State,
-};
+use axum::{extract::State, response::Json};
 use sea_orm::DbConn;
 use serde_json::{json, Value};
 use std::net::SocketAddr;
@@ -26,8 +23,17 @@ async fn main() {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    // Initialize database connection
-    let db_conn = db::establish_connection().await.expect("Failed to connect to database");
+    // Initialize database connection and run migrations
+    let db_conn = match db::establish_connection().await {
+        Ok(conn) => {
+            tracing::info!("Database connection established successfully");
+            conn
+        }
+        Err(e) => {
+            tracing::error!("Failed to connect to database: {}", e);
+            std::process::exit(1);
+        }
+    };
 
     // Create application state
     let state = AppState { db_conn };

@@ -1,12 +1,20 @@
 pub use sea_orm_migration::prelude::*;
 
-mod m20220101_000001_create_table;
+mod m20251026_150747_key;
+mod m20251026_150819_invalid_jwt;
+mod m20251026_150828_user;
+mod m20251026_151103_config;
 
 pub struct Migrator;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![Box::new(m20220101_000001_create_table::Migration)]
+        vec![
+            Box::new(m20251026_150747_key::Migration),
+            Box::new(m20251026_150819_invalid_jwt::Migration),
+            Box::new(m20251026_150828_user::Migration),
+            Box::new(m20251026_151103_config::Migration),
+        ]
     }
 }
