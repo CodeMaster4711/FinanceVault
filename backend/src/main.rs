@@ -4,6 +4,8 @@ use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tokio;
 
+mod auth;
+mod auth_service;
 mod db;
 mod routes;
 mod utils;
@@ -11,6 +13,14 @@ mod utils;
 #[derive(Clone)]
 pub struct AppState {
     pub db_conn: DbConn,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        // This is a placeholder implementation for middleware
+        // In practice, you wouldn't use this default
+        panic!("AppState should be created with actual database connection")
+    }
 }
 
 #[tokio::main]
