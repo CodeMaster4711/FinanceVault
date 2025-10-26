@@ -16,3 +16,6 @@ devenv.local.nix
 Cargo.lock
 
 finance.db
+
+/backend/db/
+/backend/target/
