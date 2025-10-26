@@ -9,3 +9,17 @@ services:
       - "3000:80"
     environment:
       - NODE_ENV=production
+
+  backend-prod:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - db_data:/data
+    environment:
+      - DATABASE_URL=sqlite:/data/finance.db
+
+volumes:
+  db_data:

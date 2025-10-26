@@ -12,3 +12,7 @@ devenv.local.nix
 *.tsbuildinfo
 
 /postgres/
+
+Cargo.lock
+
+finance.db

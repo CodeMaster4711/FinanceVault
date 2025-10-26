@@ -13,3 +13,24 @@ services:
     environment:
       - NODE_ENV=development
     command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 3000"
+
+  backend-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/usr/src/app
+      - cargo_registry:/usr/local/cargo/registry
+      - cargo_target:/usr/src/app/target
+      - db_data:/data
+    environment:
+      - DATABASE_URL=sqlite:/data/finance.db
+      - CARGO_HOME=/usr/local/cargo
+    command: sh -c "cargo install cargo-watch && cargo watch -x run"
+
+volumes:
+  cargo_registry:
+  cargo_target:
+  db_data:
