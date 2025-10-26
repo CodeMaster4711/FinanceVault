@@ -11,38 +11,53 @@
   import { Alert, AlertDescription } from "$lib/components/ui/alert/index.js";
   import { cn } from "$lib/utils.js";
   import type { HTMLAttributes } from "svelte/elements";
-  import { enhance } from "$app/forms";
-  import type { SubmitFunction } from "@sveltejs/kit";
+  import { goto } from "$app/navigation";
+  import { AuthService } from "$lib/services/auth";
 
   let { class: className, ...restProps }: HTMLAttributes<HTMLDivElement> =
     $props();
 
   const id = crypto.randomUUID();
 
+  let username = $state("");
+  let password = $state("");
   let isLoading = $state(false);
   let errorMessage = $state("");
 
-  const handleSubmit: SubmitFunction = () => {
+  async function handleSubmit(event: Event) {
+    event.preventDefault();
+
+    if (!username.trim() || !password) {
+      errorMessage = "Username and password are required";
+      return;
+    }
+
     isLoading = true;
     errorMessage = "";
 
-    return async ({ result, update }) => {
-      isLoading = false;
+    try {
+      const response = await AuthService.login(username, password);
 
-      if (result.type === "failure") {
-        errorMessage = result.data?.error || "Login failed";
-      } else if (result.type === "redirect") {
-        // Let SvelteKit handle the redirect
-        await update();
-      }
-    };
-  };
+      // Set cookie via API
+      await fetch("/api/set-auth-cookie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: response.token }),
+      });
+
+      // Redirect to home
+      goto("/");
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : "Login failed";
+      isLoading = false;
+    }
+  }
 </script>
 
 <div class={cn("flex flex-col gap-6", className)} {...restProps}>
   <Card.Root class="overflow-hidden p-0">
     <Card.Content class="grid p-0 md:grid-cols-2">
-      <form method="POST" class="p-6 md:p-8" use:enhance={handleSubmit}>
+      <form onsubmit={handleSubmit} class="p-6 md:p-8">
         <FieldGroup>
           <div class="flex flex-col items-center gap-2 text-center">
             <h1 class="text-2xl font-bold">Welcome back</h1>
@@ -61,9 +76,9 @@
             <FieldLabel for="username-{id}">Username</FieldLabel>
             <Input
               id="username-{id}"
-              name="username"
               type="text"
               placeholder="Enter your username"
+              bind:value={username}
               required
               disabled={isLoading}
             />
@@ -80,8 +95,8 @@
             </div>
             <Input
               id="password-{id}"
-              name="password"
               type="password"
+              bind:value={password}
               required
               disabled={isLoading}
             />

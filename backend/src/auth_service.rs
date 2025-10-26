@@ -68,7 +68,7 @@ impl AuthService {
         let salt = generate_salt();
         let hashed_password = hash_password(&password, &salt)?;
 
-        // Create user
+        // Create user with pre-generated UUID
         let user_id = Uuid::new_v4();
         let new_user = user::ActiveModel {
             id: ActiveValue::Set(user_id),
@@ -77,7 +77,8 @@ impl AuthService {
             salt: ActiveValue::Set(salt),
         };
 
-        new_user.insert(&self.db).await?;
+        // Insert and ignore the result (we already have the UUID)
+        let _result = new_user.insert(&self.db).await?;
 
         // Create JWT token
         let token = create_jwt(user_id, username)?;
@@ -138,21 +139,24 @@ impl AuthService {
             .one(&self.db)
             .await?
         {
-            Ok(RsaKeyPair::from_private_key(&existing_key.private_key)?)
-        } else {
-            // Generate new key pair
-            let key_pair = RsaKeyPair::generate()?;
-
-            // Save to database
-            let new_key = key::ActiveModel {
-                id: ActiveValue::Set(Uuid::new_v4()),
-                name: ActiveValue::Set(key_name.to_string()),
-                private_key: ActiveValue::Set(key_pair.private_key.clone()),
-            };
-
-            new_key.insert(&self.db).await?;
-            Ok(key_pair)
+            return Ok(RsaKeyPair::from_private_key(&existing_key.private_key)?);
         }
+
+        // Generate new key pair
+        let key_pair = RsaKeyPair::generate()?;
+
+        // Save to database with pre-generated UUID
+        let key_id = Uuid::new_v4();
+        let new_key = key::ActiveModel {
+            id: ActiveValue::Set(key_id),
+            name: ActiveValue::Set(key_name.to_string()),
+            private_key: ActiveValue::Set(key_pair.private_key.clone()),
+        };
+
+        // Insert and ignore the result (we already have the UUID)
+        let _result = new_key.insert(&self.db).await?;
+
+        Ok(key_pair)
     }
 
     pub async fn get_public_key(&self, key_name: &str) -> AuthResult<String> {
@@ -160,9 +164,8 @@ impl AuthService {
         Ok(key_pair.public_key)
     }
 
+    #[allow(dead_code)]
     pub async fn cleanup_expired_tokens(&self) -> AuthResult<()> {
-        use sea_orm::DeleteMany;
-
         let now = Utc::now().naive_utc();
         InvalidJwt::delete_many()
             .filter(invalid_jwt::Column::Exp.lt(now))
