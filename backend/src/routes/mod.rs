@@ -7,7 +7,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{info_span, Span};
 
-mod users;
+pub mod users;
 
 /// Creates the main application router and logs all registered routes.
 pub fn create_router() -> Router<AppState> {

@@ -3,12 +3,49 @@ use sea_orm::DbConn;
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tokio;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 mod auth;
 mod auth_service;
 mod db;
 mod routes;
 mod utils;
+
+use routes::users::{
+    AuthResponse, LoginRequest, PublicKeyResponse, RegisterRequest, UserProfileResponse,
+};
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        routes::users::register_user,
+        routes::users::login_user,
+        routes::users::logout_user,
+        routes::users::get_public_key,
+        routes::users::get_user_profile
+    ),
+    components(
+        schemas(RegisterRequest, LoginRequest, AuthResponse, PublicKeyResponse, UserProfileResponse)
+    ),
+    tags(
+        (name = "Authentication", description = "User authentication endpoints"),
+        (name = "Encryption", description = "RSA encryption endpoints")
+    ),
+    info(
+        title = "FinanceVault API",
+        version = "0.1.0",
+        description = "A secure financial vault API with RSA encryption and JWT authentication",
+        contact(
+            name = "FinanceVault Team",
+            email = "support@financevault.com"
+        )
+    ),
+    servers(
+        (url = "http://localhost:8000", description = "Local development server")
+    )
+)]
+pub struct ApiDoc;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -49,7 +86,9 @@ async fn main() {
     let state = AppState { db_conn };
 
     // build our application with a route
-    let app = routes::create_router().with_state(state);
+    let app = routes::create_router()
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .with_state(state);
 
     // run our app with hyper
     let addr = SocketAddr::from(([0, 0, 0, 0], 8000));

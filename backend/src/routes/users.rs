@@ -8,36 +8,47 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use utoipa::ToSchema;
 
 use crate::{auth::middleware::AuthenticatedUser, auth_service::AuthService, AppState};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct RegisterRequest {
+    /// Username for registration
     pub username: String,
+    /// RSA encrypted password
     pub encrypted_password: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct LoginRequest {
+    /// Username for login
     pub username: String,
+    /// RSA encrypted password
     pub encrypted_password: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct AuthResponse {
+    /// JWT authentication token
     pub token: String,
+    /// User UUID
     pub user_id: String,
+    /// Username
     pub username: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct PublicKeyResponse {
+    /// RSA public key in PEM format
     pub public_key: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct UserProfileResponse {
+    /// User UUID
     pub id: String,
+    /// Username
     pub username: String,
 }
 
@@ -54,8 +65,19 @@ pub fn users_routes() -> Router<AppState> {
         .merge(auth_routes)
 }
 
-// Handler for POST /api/register
-async fn register_user(
+/// Register a new user
+#[utoipa::path(
+    post,
+    path = "/api/register",
+    request_body = RegisterRequest,
+    responses(
+        (status = 200, description = "User registered successfully", body = AuthResponse),
+        (status = 409, description = "User already exists"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "Authentication"
+)]
+pub async fn register_user(
     State(state): State<AppState>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<Json<AuthResponse>, StatusCode> {
@@ -86,8 +108,19 @@ async fn register_user(
     }
 }
 
-// Handler for POST /api/login
-async fn login_user(
+/// Login user
+#[utoipa::path(
+    post,
+    path = "/api/login",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "User logged in successfully", body = AuthResponse),
+        (status = 401, description = "Invalid credentials"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "Authentication"
+)]
+pub async fn login_user(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<Json<AuthResponse>, StatusCode> {
@@ -121,8 +154,21 @@ async fn login_user(
     }
 }
 
-// Handler for POST /api/logout (protected)
-async fn logout_user(
+/// Logout user (protected)
+#[utoipa::path(
+    post,
+    path = "/api/logout",
+    responses(
+        (status = 200, description = "User logged out successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Authentication"
+)]
+pub async fn logout_user(
     AuthenticatedUser(claims): AuthenticatedUser,
     State(state): State<AppState>,
 ) -> Result<Json<Value>, StatusCode> {
@@ -142,8 +188,17 @@ async fn logout_user(
     }
 }
 
-// Handler for GET /api/public-key
-async fn get_public_key(
+/// Get RSA public key for encryption
+#[utoipa::path(
+    get,
+    path = "/api/public-key",
+    responses(
+        (status = 200, description = "Public key retrieved successfully", body = PublicKeyResponse),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "Encryption"
+)]
+pub async fn get_public_key(
     State(state): State<AppState>,
 ) -> Result<Json<PublicKeyResponse>, StatusCode> {
     let auth_service = AuthService::new(state.db_conn.clone());
@@ -157,8 +212,22 @@ async fn get_public_key(
     }
 }
 
-// Handler for GET /api/profile (protected)
-async fn get_user_profile(
+/// Get user profile (protected)
+#[utoipa::path(
+    get,
+    path = "/api/profile",
+    responses(
+        (status = 200, description = "User profile retrieved successfully", body = UserProfileResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "User not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Authentication"
+)]
+pub async fn get_user_profile(
     AuthenticatedUser(claims): AuthenticatedUser,
     State(state): State<AppState>,
 ) -> Result<Json<UserProfileResponse>, StatusCode> {

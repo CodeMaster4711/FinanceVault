@@ -25,3 +25,5 @@ base64 = "0.22"
 sha2 = "0.10"
 thiserror = "1.0"
 async-trait = "0.1"
+utoipa = { version = "4.2", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
