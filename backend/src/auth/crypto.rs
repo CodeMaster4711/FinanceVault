@@ -56,12 +56,14 @@ impl RsaKeyPair {
 }
 
 pub fn decrypt_password(encrypted_password: &str, private_key: &str) -> CryptoResult<String> {
-    use rsa::{sha2::Sha256, Oaep};
+    use rsa::Oaep;
+    use sha1::Sha1;
 
     let private_key = RsaPrivateKey::from_pkcs1_pem(private_key)?;
     let encrypted_bytes = base64::engine::general_purpose::STANDARD.decode(encrypted_password)?;
 
-    let padding = Oaep::new::<Sha256>();
+    // Use SHA-1 to match node-forge's default RSA-OAEP implementation
+    let padding = Oaep::new::<Sha1>();
     let decrypted = private_key.decrypt(padding, &encrypted_bytes)?;
 
     String::from_utf8(decrypted).map_err(|_| CryptoError::InvalidEncryptedData)
