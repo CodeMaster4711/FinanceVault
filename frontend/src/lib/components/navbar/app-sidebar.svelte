@@ -1,171 +1,86 @@
 <script lang="ts" module>
-	import AudioWaveformIcon from "@lucide/svelte/icons/audio-waveform";
-	import BookOpenIcon from "@lucide/svelte/icons/book-open";
-	import BotIcon from "@lucide/svelte/icons/bot";
-	import ChartPieIcon from "@lucide/svelte/icons/chart-pie";
-	import CommandIcon from "@lucide/svelte/icons/command";
-	import FrameIcon from "@lucide/svelte/icons/frame";
-	import GalleryVerticalEndIcon from "@lucide/svelte/icons/gallery-vertical-end";
-	import MapIcon from "@lucide/svelte/icons/map";
-	import Settings2Icon from "@lucide/svelte/icons/settings-2";
-	import SquareTerminalIcon from "@lucide/svelte/icons/square-terminal";
+  import BookOpenIcon from "@lucide/svelte/icons/book-open";
+  import CalendarIcon from "@lucide/svelte/icons/calendar";
+  import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
+  import CarIcon from "@lucide/svelte/icons/car";
+  import MapPinIcon from "@lucide/svelte/icons/map-pin";
+  import Wrench from "@lucide/svelte/icons/wrench";
+  import UsersIcon from "@lucide/svelte/icons/users";
+  import FuelIcon from "@lucide/svelte/icons/fuel";
+  import ClipboardListIcon from "@lucide/svelte/icons/clipboard-list";
+  import ChartPieIcon from "@lucide/svelte/icons/chart-pie";
+  import DollarSignIcon from "@lucide/svelte/icons/dollar-sign";
+  import TrendingUpIcon from "@lucide/svelte/icons/trending-up";
+  import PiggyBankIcon from "@lucide/svelte/icons/piggy-bank";
+  import BarChart3Icon from "@lucide/svelte/icons/bar-chart-3";
+  import SettingsIcon from "@lucide/svelte/icons/settings";
+  import ReceiptIcon from "@lucide/svelte/icons/receipt";
+  import CalendarDaysIcon from "@lucide/svelte/icons/calendar-days";
+  import TargetIcon from "@lucide/svelte/icons/target";
 
-	// This is sample data.
-	const data = {
-		user: {
-			name: "shadcn",
-			email: "m@example.com",
-			avatar: "/avatars/shadcn.jpg",
-		},
-		teams: [
-			{
-				name: "Acme Inc",
-				logo: GalleryVerticalEndIcon,
-				plan: "Enterprise",
-			},
-			{
-				name: "Acme Corp.",
-				logo: AudioWaveformIcon,
-				plan: "Startup",
-			},
-			{
-				name: "Evil Corp.",
-				logo: CommandIcon,
-				plan: "Free",
-			},
-		],
-		navMain: [
-			{
-				title: "Playground",
-				url: "#",
-				icon: SquareTerminalIcon,
-				isActive: true,
-				items: [
-					{
-						title: "History",
-						url: "#",
-					},
-					{
-						title: "Starred",
-						url: "#",
-					},
-					{
-						title: "Settings",
-						url: "#",
-					},
-				],
-			},
-			{
-				title: "Models",
-				url: "#",
-				icon: BotIcon,
-				items: [
-					{
-						title: "Genesis",
-						url: "#",
-					},
-					{
-						title: "Explorer",
-						url: "#",
-					},
-					{
-						title: "Quantum",
-						url: "#",
-					},
-				],
-			},
-			{
-				title: "Documentation",
-				url: "#",
-				icon: BookOpenIcon,
-				items: [
-					{
-						title: "Introduction",
-						url: "#",
-					},
-					{
-						title: "Get Started",
-						url: "#",
-					},
-					{
-						title: "Tutorials",
-						url: "#",
-					},
-					{
-						title: "Changelog",
-						url: "#",
-					},
-				],
-			},
-			{
-				title: "Settings",
-				url: "#",
-				icon: Settings2Icon,
-				items: [
-					{
-						title: "General",
-						url: "#",
-					},
-					{
-						title: "Team",
-						url: "#",
-					},
-					{
-						title: "Billing",
-						url: "#",
-					},
-					{
-						title: "Limits",
-						url: "#",
-					},
-				],
-			},
-		],
-		projects: [
-			{
-				name: "Design Engineering",
-				url: "#",
-				icon: FrameIcon,
-			},
-			{
-				name: "Sales & Marketing",
-				url: "#",
-				icon: ChartPieIcon,
-			},
-			{
-				name: "Travel",
-				url: "#",
-				icon: MapIcon,
-			},
-		],
-	};
+  // Data for FinanceVault app
+  const data = {
+    user: {
+      name: "Max Mustermann",
+      email: "max@example.com",
+      avatar: "/avatars/user.jpg",
+    },
+    teams: [
+      {
+        name: "FinanceVault",
+        plan: "Premium",
+      },
+    ],
+    navMain: [
+      {
+        title: "Dashboard",
+        url: "/",
+        icon: LayoutDashboardIcon,
+        isActive: true,
+      },
+      {
+        title: "Monthly Expenses",
+        url: "/expenses/monthly",
+        icon: CalendarDaysIcon,
+      },
+      {
+        title: "Expense Overview",
+        url: "/expenses/overview",
+        icon: ReceiptIcon,
+      },
+      {
+        title: "Reports",
+        url: "/reports",
+        icon: ChartPieIcon,
+      },
+    ],
+  };
 </script>
 
 <script lang="ts">
-	import NavMain from "./nav-main.svelte";
-	import NavProjects from "./nav-projects.svelte";
-	import NavUser from "./nav-user.svelte";
-	import TeamSwitcher from "./team-switcher.svelte";
-	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-	import type { ComponentProps } from "svelte";
+  import NavMain from "./nav-main.svelte";
+  import NavProjects from "./nav-projects.svelte";
+  import NavUser from "./nav-user.svelte";
+  import TeamSwitcher from "./team-switcher.svelte";
+  import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+  import type { ComponentProps } from "svelte";
 
-	let {
-		ref = $bindable(null),
-		collapsible = "icon",
-		...restProps
-	}: ComponentProps<typeof Sidebar.Root> = $props();
+  let {
+    ref = $bindable(null),
+    collapsible = "icon",
+    ...restProps
+  }: ComponentProps<typeof Sidebar.Root> = $props();
 </script>
 
 <Sidebar.Root {collapsible} {...restProps}>
-	<Sidebar.Header>
-		<TeamSwitcher teams={data.teams} />
-	</Sidebar.Header>
-	<Sidebar.Content>
-		<NavMain items={data.navMain} />
-		<NavProjects projects={data.projects} />
-	</Sidebar.Content>
-	<Sidebar.Footer>
-		<NavUser user={data.user} />
-	</Sidebar.Footer>
-	<Sidebar.Rail />
+  <Sidebar.Header>
+    <TeamSwitcher />
+  </Sidebar.Header>
+  <Sidebar.Content>
+    <NavMain items={data.navMain} />
+  </Sidebar.Content>
+  <Sidebar.Footer>
+    <NavUser user={data.user} />
+  </Sidebar.Footer>
+  <Sidebar.Rail />
 </Sidebar.Root>
