@@ -12,6 +12,7 @@
     initThemeFromStorage,
   } from "$lib/stores/theme";
   import { page } from "$app/stores";
+  import { authStore } from "$lib/stores/auth";
 
   let { children } = $props();
 
@@ -24,6 +25,9 @@
   // On the client we initialize the store from localStorage and
   // subscribe to the effective theme to keep the <html> class in sync.
   onMount(() => {
+    // Initialize auth store from localStorage
+    authStore.initialize();
+
     initThemeFromStorage();
 
     const unsub = effectiveTheme.subscribe((t) => {

@@ -13,6 +13,7 @@
   import type { HTMLAttributes } from "svelte/elements";
   import { goto } from "$app/navigation";
   import { AuthService } from "$lib/services/auth";
+  import { authStore } from "$lib/stores/auth";
 
   let { class: className, ...restProps }: HTMLAttributes<HTMLDivElement> =
     $props();
@@ -89,6 +90,12 @@
 
     try {
       const response = await AuthService.login(username, password);
+
+      // Update auth store
+      authStore.login(
+        { id: response.user_id, username: response.username },
+        response.token
+      );
 
       // Set cookie via API
       await fetch("/api/set-auth-cookie", {

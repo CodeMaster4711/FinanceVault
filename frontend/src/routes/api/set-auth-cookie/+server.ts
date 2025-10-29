@@ -4,8 +4,10 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	const { token } = await request.json();
 	
+	// If token is null or empty, delete the cookie
 	if (!token) {
-		return json({ error: 'Token required' }, { status: 400 });
+		cookies.delete('auth_token', { path: '/' });
+		return json({ success: true });
 	}
 	
 	// Set HTTP-only cookie

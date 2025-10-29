@@ -80,7 +80,7 @@
     <NavMain items={data.navMain} />
   </Sidebar.Content>
   <Sidebar.Footer>
-    <NavUser user={data.user} />
+    <NavUser />
   </Sidebar.Footer>
   <Sidebar.Rail />
 </Sidebar.Root>

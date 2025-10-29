@@ -9,10 +9,58 @@
   import CreditCardIcon from "@lucide/svelte/icons/credit-card";
   import LogOutIcon from "@lucide/svelte/icons/log-out";
   import SparklesIcon from "@lucide/svelte/icons/sparkles";
+  import UserIcon from "@lucide/svelte/icons/user";
+  import { authStore } from "$lib/stores/auth";
+  import { AuthService } from "$lib/services/auth";
+  import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
 
-  let { user }: { user: { name: string; email: string; avatar: string } } =
-    $props();
   const sidebar = useSidebar();
+
+  // Subscribe to auth store changes
+  let authState = $state($authStore);
+
+  // Create subscription effect
+  $effect(() => {
+    const unsubscribe = authStore.subscribe((state) => {
+      authState = state;
+    });
+
+    return () => unsubscribe();
+  });
+
+  // Get user initials for avatar fallback
+  let userInitials = $derived(
+    authState.user?.username
+      ? authState.user.username.substring(0, 2).toUpperCase()
+      : "U"
+  );
+
+  async function handleLogout() {
+    try {
+      if (authState.token) {
+        await AuthService.logout(authState.token);
+      }
+
+      // Clear auth cookie
+      await fetch("/api/set-auth-cookie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: null }),
+      });
+
+      // Clear store
+      authStore.logout();
+
+      // Redirect to signin
+      await goto("/signin");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // Even if API call fails, clear local state and redirect
+      authStore.logout();
+      await goto("/signin");
+    }
+  }
 </script>
 
 <Sidebar.Menu>
@@ -26,12 +74,17 @@
             {...props}
           >
             <Avatar.Root class="size-8 rounded-lg">
-              <Avatar.Image src={user.avatar} alt={user.name} />
-              <Avatar.Fallback class="rounded-lg">CN</Avatar.Fallback>
+              <Avatar.Fallback
+                class="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
+              >
+                {userInitials}
+              </Avatar.Fallback>
             </Avatar.Root>
             <div class="grid flex-1 text-left text-sm leading-tight">
-              <span class="truncate font-medium">{user.name}</span>
-              <span class="truncate text-xs">{user.email}</span>
+              <span class="truncate font-medium"
+                >{authState.user?.username || "User"}</span
+              >
+              <span class="truncate text-xs">FinanceVault</span>
             </div>
             <ChevronsUpDownIcon class="ml-auto size-4" />
           </Sidebar.MenuButton>
@@ -46,22 +99,20 @@
         <DropdownMenu.Label class="p-0 font-normal">
           <div class="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
             <Avatar.Root class="size-8 rounded-lg">
-              <Avatar.Image src={user.avatar} alt={user.name} />
-              <Avatar.Fallback class="rounded-lg">CN</Avatar.Fallback>
+              <Avatar.Fallback
+                class="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
+              >
+                {userInitials}
+              </Avatar.Fallback>
             </Avatar.Root>
             <div class="grid flex-1 text-left text-sm leading-tight">
-              <span class="truncate font-medium">{user.name}</span>
-              <span class="truncate text-xs">{user.email}</span>
+              <span class="truncate font-medium"
+                >{authState.user?.username || "User"}</span
+              >
+              <span class="truncate text-xs">FinanceVault</span>
             </div>
           </div>
         </DropdownMenu.Label>
-        <DropdownMenu.Separator />
-        <DropdownMenu.Group>
-          <DropdownMenu.Item>
-            <SparklesIcon />
-            Upgrade to Pro
-          </DropdownMenu.Item>
-        </DropdownMenu.Group>
         <DropdownMenu.Separator />
         <DropdownMenu.Group>
           <DropdownMenu.Item>
@@ -78,7 +129,7 @@
           </DropdownMenu.Item>
         </DropdownMenu.Group>
         <DropdownMenu.Separator />
-        <DropdownMenu.Item>
+        <DropdownMenu.Item onclick={handleLogout}>
           <LogOutIcon />
           Log out
         </DropdownMenu.Item>
