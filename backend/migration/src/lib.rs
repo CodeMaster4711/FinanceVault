@@ -4,6 +4,7 @@ mod m20251026_150747_key;
 mod m20251026_150819_invalid_jwt;
 mod m20251026_150828_user;
 mod m20251026_151103_config;
+mod m20251030_192944_expenses;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251026_150819_invalid_jwt::Migration),
             Box::new(m20251026_150828_user::Migration),
             Box::new(m20251026_151103_config::Migration),
+            Box::new(m20251030_192944_expenses::Migration),
         ]
     }
 }

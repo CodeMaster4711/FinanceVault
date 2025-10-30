@@ -12,9 +12,12 @@ mod db;
 mod routes;
 mod utils;
 
+use entity::*;
+
 use routes::users::{
     AuthResponse, LoginRequest, PublicKeyResponse, RegisterRequest, UserProfileResponse,
 };
+use routes::expenses::{CreateExpenseRequest, UpdateExpenseRequest};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -23,14 +26,27 @@ use routes::users::{
         routes::users::login_user,
         routes::users::logout_user,
         routes::users::get_public_key,
-        routes::users::get_user_profile
+        routes::users::get_user_profile,
+        routes::expenses::get_expenses,
+        routes::expenses::get_expense,
+        routes::expenses::create_expense
     ),
     components(
-        schemas(RegisterRequest, LoginRequest, AuthResponse, PublicKeyResponse, UserProfileResponse)
+        schemas(
+            RegisterRequest, 
+            LoginRequest, 
+            AuthResponse, 
+            PublicKeyResponse, 
+            UserProfileResponse,
+            CreateExpenseRequest,
+            UpdateExpenseRequest,
+            entity::expenses::Model
+        )
     ),
     tags(
         (name = "Authentication", description = "User authentication endpoints"),
-        (name = "Encryption", description = "RSA encryption endpoints")
+        (name = "Encryption", description = "RSA encryption endpoints"),
+        (name = "Expenses", description = "Expense management endpoints")
     ),
     info(
         title = "FinanceVault API",
