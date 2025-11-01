@@ -20,6 +20,18 @@ const initialState: AuthState = {
 	isLoading: false
 };
 
+// Helper function to get cookie value
+function getCookie(name: string): string | null {
+	if (!browser) return null;
+	
+	const value = `; ${document.cookie}`;
+	const parts = value.split(`; ${name}=`);
+	if (parts.length === 2) {
+		return parts.pop()?.split(';').shift() || null;
+	}
+	return null;
+}
+
 function createAuthStore() {
 	const { subscribe, set, update } = writable<AuthState>(initialState);
 
@@ -27,8 +39,8 @@ function createAuthStore() {
 		subscribe,
 		login: (user: User, token: string) => {
 			if (browser) {
-				localStorage.setItem('auth_token', token);
 				localStorage.setItem('user', JSON.stringify(user));
+				// Token wird vom Backend in Cookies gesetzt
 			}
 			set({
 				user,
@@ -39,8 +51,8 @@ function createAuthStore() {
 		},
 		logout: () => {
 			if (browser) {
-				localStorage.removeItem('auth_token');
 				localStorage.removeItem('user');
+				// Cookie wird vom Backend gelöscht
 			}
 			set(initialState);
 		},
@@ -49,7 +61,8 @@ function createAuthStore() {
 		},
 		initialize: () => {
 			if (browser) {
-				const token = localStorage.getItem('auth_token');
+				// Token aus Cookies lesen
+				const token = getCookie('auth_token');
 				const userStr = localStorage.getItem('user');
 				
 				if (token && userStr) {
@@ -65,6 +78,8 @@ function createAuthStore() {
 						console.error('Failed to parse stored user data:', error);
 						set(initialState);
 					}
+				} else {
+					set(initialState);
 				}
 			}
 		}

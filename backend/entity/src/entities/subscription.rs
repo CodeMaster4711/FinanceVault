@@ -20,25 +20,29 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize, ToSchema)]
-#[sea_orm(table_name = "expenses")]
+#[sea_orm(table_name = "subscriptions")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    /// Unique identifier for the expense
+    /// Unique identifier for the subscription
     pub id: Uuid,
-    /// User ID who owns this expense
+    /// User ID who owns this subscription
     pub user_id: Uuid,
-    /// Description of the expense
-    pub description: String,
-    /// Amount of the expense
+    /// Name of the subscription service
+    pub name: String,
+    /// Amount charged per billing cycle
     #[serde(
         serialize_with = "serialize_decimal",
         deserialize_with = "deserialize_decimal"
     )]
     pub amount: Decimal,
-    /// Date and time of the expense
-    pub date: DateTime,
-    /// Category of the expense
+    /// Billing cycle (monthly, yearly, etc.)
+    pub billing_cycle: String,
+    /// Next billing date
+    pub next_billing_date: DateTime,
+    /// Category of the subscription
     pub category: String,
+    /// Whether the subscription is active
+    pub is_active: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

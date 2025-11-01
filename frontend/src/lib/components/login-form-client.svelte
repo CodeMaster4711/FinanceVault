@@ -104,8 +104,8 @@
         body: JSON.stringify({ token: response.token }),
       });
 
-      // Redirect to home
-      goto("/");
+      // Redirect to monthly expenses
+      goto("/expenses/monthly");
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : "Login failed";
       isLoading = false;

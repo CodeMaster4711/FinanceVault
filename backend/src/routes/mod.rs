@@ -8,6 +8,7 @@ use tower_http::trace::TraceLayer;
 use tracing::{info_span, Span};
 
 pub mod expenses;
+pub mod subscriptions;
 pub mod users;
 
 /// Creates the main application router and logs all registered routes.
@@ -20,6 +21,7 @@ pub fn create_router() -> Router<AppState> {
 
     let api_router = Router::new()
         .merge(expenses::expenses_routes())
+        .merge(subscriptions::subscriptions_routes())
         .merge(users::users_routes());
 
     Router::new()

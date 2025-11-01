@@ -17,6 +17,7 @@
   import ReceiptIcon from "@lucide/svelte/icons/receipt";
   import CalendarDaysIcon from "@lucide/svelte/icons/calendar-days";
   import TargetIcon from "@lucide/svelte/icons/target";
+  import RepeatIcon from "@lucide/svelte/icons/repeat";
 
   // Data for FinanceVault app
   const data = {
@@ -47,6 +48,11 @@
         title: "Expense Overview",
         url: "/expenses/overview",
         icon: ReceiptIcon,
+      },
+      {
+        title: "Subscriptions",
+        url: "/subscriptions",
+        icon: RepeatIcon,
       },
       {
         title: "Reports",
