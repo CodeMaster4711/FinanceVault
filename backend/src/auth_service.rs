@@ -68,7 +68,7 @@ impl AuthService {
         let salt = generate_salt();
         let hashed_password = hash_password(&password, &salt)?;
 
-        // Create user with pre-generated UUID
+        // Create user with pre-generated UUID (SQLite can't auto-generate UUIDs)
         let user_id = Uuid::new_v4();
         let new_user = user::ActiveModel {
             id: ActiveValue::Set(user_id),
@@ -77,10 +77,12 @@ impl AuthService {
             salt: ActiveValue::Set(salt),
         };
 
-        // Insert and ignore the result (we already have the UUID)
-        let _result = new_user.insert(&self.db).await?;
+        // Insert without retrieving last_insert_id (which doesn't work with UUID PKs in SQLite)
+        User::insert(new_user)
+            .exec_without_returning(&self.db)
+            .await?;
 
-        // Create JWT token
+        // Create JWT token using our pre-generated user ID
         let token = create_jwt(user_id, username)?;
         Ok(token)
     }
@@ -114,14 +116,18 @@ impl AuthService {
     }
 
     pub async fn logout_user(&self, token: String, exp: DateTime<Utc>) -> AuthResult<()> {
-        // Add token to blacklist
+        // Add token to blacklist with pre-generated UUID
+        let jwt_id = Uuid::new_v4();
         let invalid_jwt = invalid_jwt::ActiveModel {
-            id: ActiveValue::Set(Uuid::new_v4()),
+            id: ActiveValue::Set(jwt_id),
             token: ActiveValue::Set(token),
             exp: ActiveValue::Set(exp.naive_utc()),
         };
 
-        invalid_jwt.insert(&self.db).await?;
+        // Insert without retrieving last_insert_id (which doesn't work with UUID PKs in SQLite)
+        InvalidJwt::insert(invalid_jwt)
+            .exec_without_returning(&self.db)
+            .await?;
         Ok(())
     }
 
@@ -153,8 +159,10 @@ impl AuthService {
             private_key: ActiveValue::Set(key_pair.private_key.clone()),
         };
 
-        // Insert and ignore the result (we already have the UUID)
-        let _result = new_key.insert(&self.db).await?;
+        // Insert without retrieving last_insert_id (which doesn't work with UUID PKs in SQLite)
+        Key::insert(new_key)
+            .exec_without_returning(&self.db)
+            .await?;
 
         Ok(key_pair)
     }

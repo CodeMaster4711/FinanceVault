@@ -4,7 +4,6 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use chrono::{DateTime, FixedOffset, Utc};
 use entity::{expenses, Expenses};
 use sea_orm::prelude::Decimal;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DeleteResult, EntityTrait, QueryFilter, Set};
@@ -82,10 +81,9 @@ pub async fn get_expense(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<expenses::Model>, StatusCode> {
-    // TODO: Filterung nach user_id wenn die Datenbankstruktur angepasst wird
-    // Authenticated user: user.0.user_id
-    let _ = user.0.user_id; // Aktuell nicht verwendet, aber bereit für User-Bindung
+    // Prüfen ob Expense dem User gehört
     let expense = Expenses::find_by_id(id)
+        .filter(expenses::Column::UserId.eq(user.0.user_id))
         .one(&state.db_conn)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -115,12 +113,12 @@ pub async fn create_expense(
     user: AuthenticatedUser,
     Json(payload): Json<CreateExpenseRequest>,
 ) -> Result<Json<expenses::Model>, StatusCode> {
-    // TODO: user_id zur Expense hinzufügen wenn die Datenbankstruktur angepasst wird
-    // Authenticated user: user.0.user_id
-    let _ = user.0.user_id; // Aktuell nicht verwendet, aber bereit für User-Bindung
+    // Pre-generate UUID for SQLite compatibility
+    let expense_id = Uuid::new_v4();
 
     let new_expense = expenses::ActiveModel {
-        id: Set(Uuid::new_v4()),
+        id: Set(expense_id),
+        user_id: Set(user.0.user_id),
         description: Set(payload.description),
         amount: Set(Decimal::try_from(payload.amount).map_err(|_| StatusCode::BAD_REQUEST)?),
         date: Set(
@@ -130,18 +128,20 @@ pub async fn create_expense(
         category: Set(payload.category),
     };
 
-    let expense = Expenses::insert(new_expense)
-        .exec(&state.db_conn)
+    // Insert without retrieving last_insert_id (which doesn't work with UUID PKs in SQLite)
+    Expenses::insert(new_expense)
+        .exec_without_returning(&state.db_conn)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let created_expense = Expenses::find_by_id(expense.last_insert_id)
+    // Fetch the created expense using the known ID
+    let created = Expenses::find_by_id(expense_id)
         .one(&state.db_conn)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok(Json(created_expense))
+    Ok(Json(created))
 }
 
 pub async fn update_expense(
@@ -150,18 +150,14 @@ pub async fn update_expense(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateExpenseRequest>,
 ) -> Result<Json<expenses::Model>, StatusCode> {
-    // TODO: Prüfen ob Expense dem User gehört wenn die Datenbankstruktur angepasst wird
-    // Authenticated user: user.0.user_id
-    let _ = user.0.user_id; // Aktuell nicht verwendet, aber bereit für User-Bindung
-
+    // Prüfen ob Expense dem User gehört und dann aktualisieren
     let mut expense: expenses::ActiveModel = Expenses::find_by_id(id)
+        .filter(expenses::Column::UserId.eq(user.0.user_id))
         .one(&state.db_conn)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?
-        .into();
-
-    // Nur Felder aktualisieren, die gesetzt sind
+        .into(); // Nur Felder aktualisieren, die gesetzt sind
     if let Some(description) = payload.description {
         expense.description = Set(description);
     }
@@ -194,15 +190,21 @@ pub async fn delete_expense(
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Prüfen ob Expense dem User gehört bevor löschen wenn die Datenbankstruktur angepasst wird
-    // Authenticated user: user.0.user_id
-    let _ = user.0.user_id; // Aktuell nicht verwendet, aber bereit für User-Bindung
+    // Prüfen ob Expense existiert und dem User gehört bevor löschen
+    let expense_exists = Expenses::find_by_id(id)
+        .filter(expenses::Column::UserId.eq(user.0.user_id))
+        .one(&state.db_conn)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if expense_exists.is_none() {
+        return Err(StatusCode::NOT_FOUND);
+    }
 
     let result: DeleteResult = Expenses::delete_by_id(id)
         .exec(&state.db_conn)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
     if result.rows_affected == 0 {
         return Err(StatusCode::NOT_FOUND);
     }
