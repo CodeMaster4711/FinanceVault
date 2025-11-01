@@ -71,6 +71,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser
     type Rejection = StatusCode;
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+        tracing::info!("Request headers: {:?}", parts.headers);
         let token = parts
             .headers
             .get("Authorization")

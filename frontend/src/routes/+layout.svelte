@@ -14,7 +14,7 @@
   import { page } from "$app/stores";
   import { authStore } from "$lib/stores/auth";
 
-  let { children } = $props();
+  let { data, children } = $props();
 
   // Check if we should show the sidebar (not on signin/signup pages)
   let showSidebar = $derived(
@@ -25,9 +25,7 @@
   // On the client we initialize the store from localStorage and
   // subscribe to the effective theme to keep the <html> class in sync.
   onMount(() => {
-    // Initialize auth store from localStorage
-    authStore.initialize();
-
+    authStore.init(data.user);
     initThemeFromStorage();
 
     const unsub = effectiveTheme.subscribe((t) => {

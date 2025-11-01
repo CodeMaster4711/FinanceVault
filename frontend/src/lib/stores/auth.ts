@@ -37,11 +37,22 @@ function createAuthStore() {
 
 	return {
 		subscribe,
-		login: (user: User, token: string) => {
+		init: (user: User | null) => {
 			if (browser) {
-				localStorage.setItem('user', JSON.stringify(user));
-				// Token wird vom Backend in Cookies gesetzt
+				const token = getCookie('auth_token');
+				if (user && token) {
+					set({
+						user,
+						token,
+						isAuthenticated: true,
+						isLoading: false
+					});
+				} else {
+					set(initialState);
+				}
 			}
+		},
+		login: (user: User, token: string) => {
 			set({
 				user,
 				token,
@@ -50,42 +61,11 @@ function createAuthStore() {
 			});
 		},
 		logout: () => {
-			if (browser) {
-				localStorage.removeItem('user');
-				// Cookie wird vom Backend gelöscht
-			}
+			// Cookie is deleted by the /api/set-auth-cookie endpoint
 			set(initialState);
 		},
 		setLoading: (loading: boolean) => {
 			update(state => ({ ...state, isLoading: loading }));
-		},
-		initialize: () => {
-			if (browser) {
-				// Token aus Cookies lesen
-				const token = getCookie('auth_token');
-				const userStr = localStorage.getItem('user');
-				
-				console.log('Auth store initializing...', { token: token ? 'present' : 'missing', user: userStr ? 'present' : 'missing' });
-				
-				if (token && userStr) {
-					try {
-						const user = JSON.parse(userStr);
-						console.log('Auth store initialized with user:', user);
-						set({
-							user,
-							token,
-							isAuthenticated: true,
-							isLoading: false
-						});
-					} catch (error) {
-						console.error('Failed to parse stored user data:', error);
-						set(initialState);
-					}
-				} else {
-					console.log('Auth store: No token or user found, setting initial state');
-					set(initialState);
-				}
-			}
 		}
 	};
 }
