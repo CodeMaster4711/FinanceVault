@@ -9,30 +9,30 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Subscription::Table)
+                    .table(Subscriptions::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(Subscription::Id)
+                        ColumnDef::new(Subscriptions::Id)
                             .uuid()
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Subscription::UserId).uuid().not_null())
-                    .col(ColumnDef::new(Subscription::Name).string().not_null())
-                    .col(ColumnDef::new(Subscription::Amount).decimal().not_null())
+                    .col(ColumnDef::new(Subscriptions::UserId).uuid().not_null())
+                    .col(ColumnDef::new(Subscriptions::Name).string().not_null())
+                    .col(ColumnDef::new(Subscriptions::Amount).decimal().not_null())
                     .col(
-                        ColumnDef::new(Subscription::BillingCycle)
+                        ColumnDef::new(Subscriptions::BillingCycle)
                             .string()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(Subscription::NextBillingDate)
+                        ColumnDef::new(Subscriptions::NextBillingDate)
                             .date_time()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(Subscription::Category).string().not_null())
+                    .col(ColumnDef::new(Subscriptions::Category).string().not_null())
                     .col(
-                        ColumnDef::new(Subscription::IsActive)
+                        ColumnDef::new(Subscriptions::IsActive)
                             .boolean()
                             .not_null()
                             .default(true),
@@ -40,7 +40,7 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_subscription_user")
-                            .from(Subscription::Table, Subscription::UserId)
+                            .from(Subscriptions::Table, Subscriptions::UserId)
                             .to(User::Table, User::Id)
                             .on_delete(ForeignKeyAction::Cascade)
                             .on_update(ForeignKeyAction::Cascade),
@@ -52,13 +52,13 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Subscription::Table).to_owned())
+            .drop_table(Table::drop().table(Subscriptions::Table).to_owned())
             .await
     }
 }
 
 #[derive(DeriveIden)]
-enum Subscription {
+enum Subscriptions {
     Table,
     Id,
     UserId,

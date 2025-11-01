@@ -65,9 +65,12 @@ function createAuthStore() {
 				const token = getCookie('auth_token');
 				const userStr = localStorage.getItem('user');
 				
+				console.log('Auth store initializing...', { token: token ? 'present' : 'missing', user: userStr ? 'present' : 'missing' });
+				
 				if (token && userStr) {
 					try {
 						const user = JSON.parse(userStr);
+						console.log('Auth store initialized with user:', user);
 						set({
 							user,
 							token,
@@ -79,6 +82,7 @@ function createAuthStore() {
 						set(initialState);
 					}
 				} else {
+					console.log('Auth store: No token or user found, setting initial state');
 					set(initialState);
 				}
 			}

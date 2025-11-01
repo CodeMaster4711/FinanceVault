@@ -57,7 +57,20 @@ pub async fn get_subscriptions(
         .filter(subscription::Column::UserId.eq(user.0.user_id))
         .all(&state.db_conn)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!("Database error getting subscriptions: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    tracing::info!("Found {} subscriptions for user", subscriptions.len());
+
+    match serde_json::to_string(&subscriptions) {
+        Ok(json) => tracing::info!("Serialized subscriptions: {}", json),
+        Err(e) => {
+            tracing::error!("Failed to serialize subscriptions: {:?}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
 
     Ok(Json(subscriptions))
 }
