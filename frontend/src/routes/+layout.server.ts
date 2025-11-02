@@ -1,21 +1,44 @@
-import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '$env/static/private';
 
-export const load: LayoutServerLoad = async ({ cookies, url }) => {
-	const token = cookies.get('auth_token');
-	const publicPaths = ['/signin', '/signup'];
-	
-	// If no token and not on a public path, redirect to signin
-	if (!token && !publicPaths.includes(url.pathname)) {
-		throw redirect(302, '/signin');
-	}
-	
-	// If token exists and user is on signin/signup, redirect to home
-	if (token && publicPaths.includes(url.pathname)) {
-		throw redirect(302, '/');
-	}
-	
-	return {
-		user: token ? { authenticated: true } : null
-	};
+interface User {
+    id: string;
+    username: string;
+}
+
+export const load: LayoutServerLoad = async ({ cookies }) => {
+    console.log('[+layout.server.ts] Executing load function...');
+    const token = cookies.get('auth_token');
+
+    if (token) {
+        console.log('[+layout.server.ts] Auth token found:', token.substring(0, 15) + '...');
+        try {
+            if (!JWT_SECRET) {
+                console.error('[+layout.server.ts] JWT_SECRET is not defined!');
+                cookies.delete('auth_token', { path: '/' });
+                return { user: null, token: null };
+            }
+            console.log('[+layout.server.ts] Verifying token...');
+            const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+            console.log('[+layout.server.ts] Token verified successfully. Decoded payload:', decoded);
+
+            if (decoded && typeof decoded === 'object') {
+                const user: User = {
+                    id: decoded.user_id,
+                    username: decoded.username
+                };
+                console.log('[+layout.server.ts] Returning user and token:', { user, token });
+                return { user, token };
+            }
+        } catch (error) {
+            console.error('[+layout.server.ts] Failed to verify token:', error);
+            cookies.delete('auth_token', { path: '/' });
+            return { user: null, token: null };
+        }
+    } else {
+        console.log('[+layout.server.ts] No auth token found in cookies.');
+    }
+
+    return { user: null, token: null };
 };

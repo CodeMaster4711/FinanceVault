@@ -1,5 +1,14 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
+
+// Redirect to home if already logged in
+export const load: PageServerLoad = async ({ cookies }) => {
+	const token = cookies.get('auth_token');
+	if (token) {
+		throw redirect(303, '/');
+	}
+	return {};
+};
 
 export const actions = {
 	default: async ({ request, cookies, fetch }) => {

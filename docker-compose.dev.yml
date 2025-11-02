@@ -7,14 +7,19 @@ services:
       dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     volumes:
       - ./frontend:/app
       - /app/node_modules
     environment:
       - NODE_ENV=development
-    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 3000"
+      - JWT_SECRET=${JWT_SECRET}
+    command: sh -c "npm ci && JWT_SECRET=${JWT_SECRET} npm run dev -- --host 0.0.0.0 --port 3000"
 
   backend-dev:
+    env_file:
+      - .env
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -28,7 +33,8 @@ services:
     environment:
       - DATABASE_URL=sqlite:/data/finance.db
       - CARGO_HOME=/usr/local/cargo
-    command: sh -c "cargo install cargo-watch && cargo watch -x run"
+      - JWT_SECRET=${JWT_SECRET}
+    command: sh -c "cargo install cargo-watch && JWT_SECRET=${JWT_SECRET} cargo watch -x run"
 
 volumes:
   cargo_registry:
