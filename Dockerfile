@@ -32,7 +32,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Cargo files
-COPY backend/Cargo.toml backend/Cargo.lock ./
+COPY backend/Cargo.toml ./
+# Cargo.lock wird automatisch generiert falls nicht vorhanden
 
 # Copy entity and migration crates
 COPY backend/entity/ ./entity/
