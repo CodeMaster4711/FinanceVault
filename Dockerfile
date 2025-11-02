@@ -34,23 +34,29 @@ RUN apt-get update && apt-get install -y \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Cargo files
-COPY backend/Cargo.toml ./
-# Cargo.lock wird automatisch generiert falls nicht vorhanden
+# Copy Cargo files for dependency caching
+COPY backend/Cargo.toml backend/Cargo.lock ./
+COPY backend/entity/Cargo.toml ./entity/Cargo.toml
+COPY backend/migration/Cargo.toml ./migration/Cargo.toml
 
-# Copy entity and migration crates
-COPY backend/entity/ ./entity/
-COPY backend/migration/ ./migration/
+# Create dummy source files to cache dependencies
+RUN mkdir -p src entity/src migration/src && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "pub fn dummy() {}" > entity/src/lib.rs && \
+    echo "pub fn dummy() {}" > migration/src/lib.rs
 
-# Create dummy main.rs to cache dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+# Build dependencies (this layer will be cached)
 RUN cargo build --release
-RUN rm -rf src
+
+# Remove dummy files
+RUN rm -rf src entity/src migration/src
 
 # Copy actual source code
+COPY backend/entity/src/ ./entity/src/
+COPY backend/migration/src/ ./migration/src/
 COPY backend/src/ ./src/
 
-# Build the backend
+# Build the backend (only app code, dependencies are cached)
 RUN cargo build --release
 
 ###################
