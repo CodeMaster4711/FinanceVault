@@ -26,8 +26,10 @@
   // On the client we initialize the store from localStorage and
   // subscribe to the effective theme to keep the <html> class in sync.
   onMount(() => {
+    console.log('[+layout.svelte] Component mounted.');
+    console.log('[+layout.svelte] Data received from load function:', data);
     // Initialize auth store with user from server
-    authStore.init(data.user);
+    authStore.init(data.user, data.token);
 
     // Initialize theme
     initThemeFromStorage();

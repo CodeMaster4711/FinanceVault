@@ -23,12 +23,15 @@ export class ApiClient {
 		options: RequestInit = {},
 		token?: string
 	): Promise<Response> {
-		// Get token from cookie if not provided
+		console.log(`[ApiClient] Making request to: ${url}`, { options });
+
+		// Get token from store if not provided
 		if (!token && browser) {
-			const cookieToken = this.getTokenFromCookie();
-			if (cookieToken) {
-				token = cookieToken;
-			}
+			authStore.subscribe(state => {
+				if (state.token) {
+					token = state.token;
+				}
+			});
 		}
 
 		// Add authorization header if token exists
@@ -49,19 +52,28 @@ export class ApiClient {
 		}
 
 		if (token) {
+			console.log('[ApiClient] Attaching token to request headers.');
 			headers['Authorization'] = `Bearer ${token}`;
+		} else {
+			console.log('[ApiClient] No token found to attach to request.');
 		}
 
 		try {
+			console.log('[ApiClient] Sending fetch request...');
 			const response = await fetch(`${API_BASE_URL}${url}`, {
 				...options,
 				headers,
 				credentials: 'include', // Important for cookies
 			});
 
+			console.log(`[ApiClient] Received response from: ${url}`, {
+				status: response.status,
+				statusText: response.statusText,
+			});
+
 			// Handle 401 Unauthorized - session expired or invalid
 			if (response.status === 401) {
-				console.log('Received 401, logging out user');
+				console.log('[ApiClient] Received 401, logging out user');
 				await this.handleUnauthorized();
 				
 				const error = new Error('Unauthorized') as ApiError;
@@ -78,7 +90,7 @@ export class ApiClient {
 			}
 
 			// Network or other errors
-			console.error('API request failed:', error);
+			console.error(`[ApiClient] API request to ${url} failed:`, error);
 			throw error;
 		}
 	}
@@ -94,11 +106,15 @@ export class ApiClient {
 	 * Helper for POST requests
 	 */
 	static async post(url: string, body?: unknown, token?: string): Promise<Response> {
+		const headers: Record<string, string> = {
+			'Content-Type': 'application/json'
+		};
+		
 		return this.fetch(
 			url,
 			{
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers,
 				body: body ? JSON.stringify(body) : undefined,
 			},
 			token
@@ -109,11 +125,15 @@ export class ApiClient {
 	 * Helper for PUT requests
 	 */
 	static async put(url: string, body?: unknown, token?: string): Promise<Response> {
+		const headers: Record<string, string> = {
+			'Content-Type': 'application/json'
+		};
+		
 		return this.fetch(
 			url,
 			{
 				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
+				headers,
 				body: body ? JSON.stringify(body) : undefined,
 			},
 			token
@@ -228,17 +248,5 @@ export class ApiClient {
 		}
 	}
 
-	/**
-	 * Gets token from cookie
-	 */
-	private static getTokenFromCookie(): string | null {
-		if (!browser) return null;
-
-		const value = `; ${document.cookie}`;
-		const parts = value.split(`; auth_token=`);
-		if (parts.length === 2) {
-			return parts.pop()?.split(';').shift() || null;
-		}
-		return null;
-	}
+	
 }

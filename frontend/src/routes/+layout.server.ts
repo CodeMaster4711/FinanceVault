@@ -1,6 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 import jwt from 'jsonwebtoken';
-
+import { JWT_SECRET } from '$env/static/private';
 
 interface User {
     id: string;
@@ -8,32 +8,37 @@ interface User {
 }
 
 export const load: LayoutServerLoad = async ({ cookies }) => {
+    console.log('[+layout.server.ts] Executing load function...');
     const token = cookies.get('auth_token');
 
     if (token) {
+        console.log('[+layout.server.ts] Auth token found:', token.substring(0, 15) + '...');
         try {
-            console.log('JWT_SECRET (from process.env):', process.env.JWT_SECRET ? 'DEFINED' : 'UNDEFINED');
-            console.log('Token received:', token ? 'DEFINED' : 'UNDEFINED', token ? token.substring(0, 10) + '...' : '');
-            if (!process.env.JWT_SECRET) {
-                console.error('JWT_SECRET is not defined in +layout.server.ts');
+            if (!JWT_SECRET) {
+                console.error('[+layout.server.ts] JWT_SECRET is not defined!');
                 cookies.delete('auth_token', { path: '/' });
-                return { user: null };
+                return { user: null, token: null };
             }
-            const decoded = jwt.verify(token, process.env.JWT_SECRET) as jwt.JwtPayload;
+            console.log('[+layout.server.ts] Verifying token...');
+            const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+            console.log('[+layout.server.ts] Token verified successfully. Decoded payload:', decoded);
+
             if (decoded && typeof decoded === 'object') {
                 const user: User = {
                     id: decoded.user_id,
                     username: decoded.username
                 };
-                return { user };
+                console.log('[+layout.server.ts] Returning user and token:', { user, token });
+                return { user, token };
             }
         } catch (error) {
-            console.error('Failed to verify token:', error);
-            // Clear the invalid cookie
+            console.error('[+layout.server.ts] Failed to verify token:', error);
             cookies.delete('auth_token', { path: '/' });
-            return { user: null };
+            return { user: null, token: null };
         }
+    } else {
+        console.log('[+layout.server.ts] No auth token found in cookies.');
     }
 
-    return { user: null };
+    return { user: null, token: null };
 };

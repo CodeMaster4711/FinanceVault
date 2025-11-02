@@ -2,7 +2,9 @@ use crate::{auth::middleware::AuthenticatedUser, AppState};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    routing::{get},
     Json,
+    Router,
 };
 use entity::{subscription, Subscription};
 use sea_orm::prelude::Decimal;
@@ -272,11 +274,6 @@ pub async fn delete_subscription(
 
     Ok(StatusCode::NO_CONTENT)
 }
-
-use axum::{
-    routing::{delete, get, post, put},
-    Router,
-};
 
 pub fn subscriptions_routes() -> Router<AppState> {
     Router::new()

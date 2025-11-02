@@ -2,7 +2,9 @@ use crate::{auth::middleware::AuthenticatedUser, AppState};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    routing::{get},
     Json,
+    Router,
 };
 use entity::{expenses, Expenses};
 use sea_orm::prelude::Decimal;
@@ -144,6 +146,26 @@ pub async fn create_expense(
     Ok(Json(created))
 }
 
+/// Update an expense
+#[utoipa::path(
+    put,
+    path = "/api/expenses/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Expense ID")
+    ),
+    request_body = UpdateExpenseRequest,
+    responses(
+        (status = 200, description = "Expense updated successfully", body = expenses::Model),
+        (status = 400, description = "Bad request - invalid data"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Expense not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "Expenses",
+    security(
+        ("jwt_token" = [])
+    )
+)]
 pub async fn update_expense(
     State(state): State<AppState>,
     user: AuthenticatedUser,
@@ -185,6 +207,24 @@ pub async fn update_expense(
     Ok(Json(result))
 }
 
+/// Delete an expense
+#[utoipa::path(
+    delete,
+    path = "/api/expenses/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Expense ID")
+    ),
+    responses(
+        (status = 204, description = "Expense deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Expense not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "Expenses",
+    security(
+        ("jwt_token" = [])
+    )
+)]
 pub async fn delete_expense(
     State(state): State<AppState>,
     user: AuthenticatedUser,
@@ -212,11 +252,6 @@ pub async fn delete_expense(
     Ok(StatusCode::NO_CONTENT)
 }
 
-use axum::{
-    routing::{delete, get, post, put},
-    Router,
-};
-
 pub fn expenses_routes() -> Router<AppState> {
     Router::new()
         .route("/expenses", get(get_expenses).post(create_expense))
@@ -225,3 +260,4 @@ pub fn expenses_routes() -> Router<AppState> {
             get(get_expense).put(update_expense).delete(delete_expense),
         )
 }
+

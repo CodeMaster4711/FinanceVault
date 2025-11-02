@@ -1,11 +1,12 @@
 use axum::{
     extract::State,
-    http::StatusCode,
-    response::Json,
+    http::{header, StatusCode},
+    response::{IntoResponse, Json},
     routing::{get, post},
     Router,
 };
 use chrono::{DateTime, Utc};
+use cookie::{Cookie, SameSite};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use utoipa::ToSchema;
@@ -81,7 +82,7 @@ pub fn users_routes() -> Router<AppState> {
 pub async fn register_user(
     State(state): State<AppState>,
     Json(payload): Json<RegisterRequest>,
-) -> Result<Json<AuthResponse>, StatusCode> {
+) -> Result<impl IntoResponse, StatusCode> {
     let auth_service = AuthService::new(state.db_conn.clone());
 
     match auth_service
@@ -91,11 +92,24 @@ pub async fn register_user(
         Ok(token) => {
             // Extract user info from token for response
             match crate::auth::jwt::verify_jwt(&token) {
-                Ok(token_data) => Ok(Json(AuthResponse {
-                    token,
-                    user_id: token_data.claims.user_id.to_string(),
-                    username: token_data.claims.username,
-                })),
+                Ok(token_data) => {
+                    let cookie = Cookie::build(("auth_token", token.clone()))
+                        .path("/")
+                        .http_only(true)
+                        .same_site(SameSite::Strict)
+                        .build();
+
+                    let response = (
+                        StatusCode::OK,
+                        [(header::SET_COOKIE, cookie.to_string())],
+                        Json(AuthResponse {
+                            token,
+                            user_id: token_data.claims.user_id.to_string(),
+                            username: token_data.claims.username,
+                        }),
+                    );
+                    Ok(response)
+                }
                 Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
             }
         }
@@ -124,7 +138,7 @@ pub async fn register_user(
 pub async fn login_user(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
-) -> Result<Json<AuthResponse>, StatusCode> {
+) -> Result<impl IntoResponse, StatusCode> {
     let auth_service = AuthService::new(state.db_conn.clone());
 
     match auth_service
@@ -134,11 +148,24 @@ pub async fn login_user(
         Ok(token) => {
             // Extract user info from token for response
             match crate::auth::jwt::verify_jwt(&token) {
-                Ok(token_data) => Ok(Json(AuthResponse {
-                    token,
-                    user_id: token_data.claims.user_id.to_string(),
-                    username: token_data.claims.username,
-                })),
+                Ok(token_data) => {
+                    let cookie = Cookie::build(("auth_token", token.clone()))
+                        .path("/")
+                        .http_only(true)
+                        .same_site(SameSite::Strict)
+                        .build();
+
+                    let response = (
+                        StatusCode::OK,
+                        [(header::SET_COOKIE, cookie.to_string())],
+                        Json(AuthResponse {
+                            token,
+                            user_id: token_data.claims.user_id.to_string(),
+                            username: token_data.claims.username,
+                        }),
+                    );
+                    Ok(response)
+                }
                 Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
             }
         }

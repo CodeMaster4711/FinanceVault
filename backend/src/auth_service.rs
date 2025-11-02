@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use entity::{invalid_jwt, key, user, InvalidJwt, Key, User};
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+use sea_orm::{ ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
 };
 use thiserror::Error;
 use uuid::Uuid;
@@ -27,8 +26,7 @@ pub enum AuthError {
     InvalidCredentials,
     #[error("User already exists")]
     UserAlreadyExists,
-    #[error("Key not found")]
-    KeyNotFound,
+    
 }
 
 pub type AuthResult<T> = Result<T, AuthError>;

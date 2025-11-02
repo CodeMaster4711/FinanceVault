@@ -80,7 +80,7 @@
       name: "",
       amount: 0,
       billing_cycle: "monthly",
-      next_billing_date: now.toISOString().slice(0, 19).replace("T", " "),
+      next_billing_date: now.toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
       category: "Streaming",
     };
     showAddDialog = true;
@@ -91,11 +91,15 @@
     if (!token) return;
 
     try {
+      // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
+      const dateForBackend =
+        formData.next_billing_date.replace("T", " ") + ":00";
+
       const request: CreateSubscriptionRequest = {
         name: formData.name,
         amount: formData.amount,
         billing_cycle: formData.billing_cycle,
-        next_billing_date: formData.next_billing_date,
+        next_billing_date: dateForBackend,
         category: formData.category,
       };
 
@@ -113,11 +117,15 @@
     const subscription = subscriptions.find((s) => s.id === id);
     if (subscription) {
       editingSubscription = subscription;
+      // Convert backend format (YYYY-MM-DD HH:MM:SS) to datetime-local format (YYYY-MM-DDTHH:MM)
+      const dateForInput = subscription.next_billing_date
+        .slice(0, 16)
+        .replace(" ", "T");
       formData = {
         name: subscription.name,
         amount: parseFloat(subscription.amount.toString()),
         billing_cycle: subscription.billing_cycle,
-        next_billing_date: subscription.next_billing_date,
+        next_billing_date: dateForInput,
         category: subscription.category,
       };
       showEditDialog = true;
@@ -131,13 +139,17 @@
     if (!token) return;
 
     try {
+      // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
+      const dateForBackend =
+        formData.next_billing_date.replace("T", " ") + ":00";
+
       await SubscriptionService.updateSubscription(
         editingSubscription.id,
         {
           name: formData.name,
           amount: formData.amount,
           billing_cycle: formData.billing_cycle,
-          next_billing_date: formData.next_billing_date,
+          next_billing_date: dateForBackend,
           category: formData.category,
         },
         token

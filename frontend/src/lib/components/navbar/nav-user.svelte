@@ -17,17 +17,8 @@
 
   const sidebar = useSidebar();
 
-  // Subscribe to auth store changes
-  let authState = $state($authStore);
-
-  // Create subscription effect
-  $effect(() => {
-    const unsubscribe = authStore.subscribe((state) => {
-      authState = state;
-    });
-
-    return () => unsubscribe();
-  });
+  // Subscribe to auth store - use $derived for reactivity
+  let authState = $derived($authStore);
 
   // Get user initials for avatar fallback
   let userInitials = $derived(

@@ -21,27 +21,16 @@ const initialState: AuthState = {
 	isLoading: false
 };
 
-// Helper function to get cookie value
-function getCookie(name: string): string | null {
-	if (!browser) return null;
-	
-	const value = `; ${document.cookie}`;
-	const parts = value.split(`; ${name}=`);
-	if (parts.length === 2) {
-		return parts.pop()?.split(';').shift() || null;
-	}
-	return null;
-}
-
 function createAuthStore() {
 	const { subscribe, set, update } = writable<AuthState>(initialState);
 
 	return {
 		subscribe,
-		init: (user: User | null) => {
+		init: (user: User | null, token: string | null) => {
+			console.log('[auth.ts] Initializing authStore...', { user, token });
 			if (browser) {
-				const token = getCookie('auth_token');
 				if (user && token) {
+					console.log('[auth.ts] User and token found, setting auth state.');
 					set({
 						user,
 						token,
@@ -51,12 +40,14 @@ function createAuthStore() {
 					// Start periodic session validation
 					ApiClient.startSessionCheck();
 				} else {
+					console.log('[auth.ts] No user or token, setting initial state.');
 					set(initialState);
 					ApiClient.stopSessionCheck();
 				}
 			}
 		},
 		login: (user: User, token: string) => {
+			console.log('[auth.ts] Logging in user:', user);
 			set({
 				user,
 				token,
@@ -69,6 +60,7 @@ function createAuthStore() {
 			}
 		},
 		logout: () => {
+			console.log('[auth.ts] Logging out user.');
 			// Stop periodic session validation
 			if (browser) {
 				ApiClient.stopSessionCheck();

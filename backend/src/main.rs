@@ -12,7 +12,7 @@ mod db;
 mod routes;
 mod utils;
 
-use entity::*;
+
 
 use routes::users::{
     AuthResponse, LoginRequest, PublicKeyResponse, RegisterRequest, UserProfileResponse,

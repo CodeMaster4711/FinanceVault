@@ -198,10 +198,11 @@
 
   // Expense handlers
   function handleAddExpense() {
+    const now = new Date();
     expenseFormData = {
       description: "",
       amount: 0,
-      date: new Date().toISOString().slice(0, 19).replace("T", " "),
+      date: now.toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM for datetime-local
       category: "Lebensmittel",
     };
     showAddExpenseDialog = true;
@@ -212,7 +213,14 @@
     if (!token) return;
 
     try {
-      await ExpenseService.createExpense(expenseFormData, token);
+      // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
+      const dateForBackend = expenseFormData.date.replace("T", " ") + ":00";
+      const expenseData = {
+        ...expenseFormData,
+        date: dateForBackend,
+      };
+
+      await ExpenseService.createExpense(expenseData, token);
       showAddExpenseDialog = false;
       await loadData();
       toast.success("Ausgabe erfolgreich erstellt");
@@ -226,10 +234,12 @@
     const expense = allExpenses[expenses.findIndex((e) => e.id === id)];
     if (expense) {
       editingExpense = expense;
+      // Convert backend format (YYYY-MM-DD HH:MM:SS) to datetime-local format (YYYY-MM-DDTHH:MM)
+      const dateForInput = expense.date.slice(0, 16).replace(" ", "T");
       expenseFormData = {
         description: expense.description,
         amount: parseFloat(expense.amount.toString()),
-        date: expense.date,
+        date: dateForInput,
         category: expense.category,
       };
       showEditExpenseDialog = true;
@@ -243,11 +253,14 @@
     if (!token) return;
 
     try {
-      await ExpenseService.updateExpense(
-        editingExpense.id,
-        expenseFormData,
-        token
-      );
+      // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
+      const dateForBackend = expenseFormData.date.replace("T", " ") + ":00";
+      const expenseData = {
+        ...expenseFormData,
+        date: dateForBackend,
+      };
+
+      await ExpenseService.updateExpense(editingExpense.id, expenseData, token);
       showEditExpenseDialog = false;
       await loadData();
       toast.success("Ausgabe erfolgreich aktualisiert");
@@ -287,7 +300,7 @@
       name: "",
       amount: 0,
       billing_cycle: "monthly",
-      next_billing_date: now.toISOString().slice(0, 19).replace("T", " "),
+      next_billing_date: now.toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
       category: "Streaming",
     };
     showAddSubscriptionDialog = true;
@@ -298,7 +311,15 @@
     if (!token) return;
 
     try {
-      await SubscriptionService.createSubscription(subscriptionFormData, token);
+      // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
+      const dateForBackend =
+        subscriptionFormData.next_billing_date.replace("T", " ") + ":00";
+      const subscriptionData = {
+        ...subscriptionFormData,
+        next_billing_date: dateForBackend,
+      };
+
+      await SubscriptionService.createSubscription(subscriptionData, token);
       showAddSubscriptionDialog = false;
       await loadData();
       toast.success("Abonnement erfolgreich erstellt");
@@ -313,11 +334,15 @@
       allSubscriptions[subscriptions.findIndex((s) => s.id === id)];
     if (subscription) {
       editingSubscription = subscription;
+      // Convert backend format (YYYY-MM-DD HH:MM:SS) to datetime-local format (YYYY-MM-DDTHH:MM)
+      const dateForInput = subscription.next_billing_date
+        .slice(0, 16)
+        .replace(" ", "T");
       subscriptionFormData = {
         name: subscription.name,
         amount: parseFloat(subscription.amount.toString()),
         billing_cycle: subscription.billing_cycle,
-        next_billing_date: subscription.next_billing_date,
+        next_billing_date: dateForInput,
         category: subscription.category,
       };
       showEditSubscriptionDialog = true;
@@ -331,9 +356,17 @@
     if (!token) return;
 
     try {
+      // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
+      const dateForBackend =
+        subscriptionFormData.next_billing_date.replace("T", " ") + ":00";
+      const subscriptionData = {
+        ...subscriptionFormData,
+        next_billing_date: dateForBackend,
+      };
+
       await SubscriptionService.updateSubscription(
         editingSubscription.id,
-        subscriptionFormData,
+        subscriptionData,
         token
       );
       showEditSubscriptionDialog = false;
