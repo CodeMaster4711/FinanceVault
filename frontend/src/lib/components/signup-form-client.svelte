@@ -74,8 +74,8 @@
         body: JSON.stringify({ token: response.token }),
       });
 
-      // Redirect to monthly expenses
-      goto("/expenses/monthly");
+      // Redirect to home
+      goto("/");
     } catch (error) {
       errorMessage =
         error instanceof Error ? error.message : "Registration failed";

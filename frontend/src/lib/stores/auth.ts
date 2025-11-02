@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import { ApiClient } from '$lib/services/api-client';
 
 interface User {
 	id: string;
@@ -47,8 +48,11 @@ function createAuthStore() {
 						isAuthenticated: true,
 						isLoading: false
 					});
+					// Start periodic session validation
+					ApiClient.startSessionCheck();
 				} else {
 					set(initialState);
+					ApiClient.stopSessionCheck();
 				}
 			}
 		},
@@ -59,8 +63,16 @@ function createAuthStore() {
 				isAuthenticated: true,
 				isLoading: false
 			});
+			// Start periodic session validation
+			if (browser) {
+				ApiClient.startSessionCheck();
+			}
 		},
 		logout: () => {
+			// Stop periodic session validation
+			if (browser) {
+				ApiClient.stopSessionCheck();
+			}
 			// Cookie is deleted by the /api/set-auth-cookie endpoint
 			set(initialState);
 		},

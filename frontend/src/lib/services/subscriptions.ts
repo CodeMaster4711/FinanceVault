@@ -1,6 +1,4 @@
-import { PUBLIC_API_BASE_URL } from '$env/static/public';
-
-const API_BASE_URL = PUBLIC_API_BASE_URL;
+import { ApiClient } from './api-client';
 
 export interface Subscription {
 	id: string;
@@ -32,11 +30,7 @@ export interface UpdateSubscriptionRequest {
 
 export class SubscriptionService {
 	static async getSubscriptions(token: string): Promise<Subscription[]> {
-		const response = await fetch(`${API_BASE_URL}/subscriptions`, {
-			headers: {
-				'Authorization': `Bearer ${token}`,
-			},
-		});
+		const response = await ApiClient.get('/subscriptions', token);
 
 		if (!response.ok) {
 			throw new Error('Failed to fetch subscriptions');
@@ -46,11 +40,7 @@ export class SubscriptionService {
 	}
 
 	static async getSubscription(id: string, token: string): Promise<Subscription> {
-		const response = await fetch(`${API_BASE_URL}/subscriptions/${id}`, {
-			headers: {
-				'Authorization': `Bearer ${token}`,
-			},
-		});
+		const response = await ApiClient.get(`/subscriptions/${id}`, token);
 
 		if (!response.ok) {
 			if (response.status === 404) {
@@ -66,14 +56,7 @@ export class SubscriptionService {
 		subscription: CreateSubscriptionRequest,
 		token: string
 	): Promise<Subscription> {
-		const response = await fetch(`${API_BASE_URL}/subscriptions`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${token}`,
-			},
-			body: JSON.stringify(subscription),
-		});
+		const response = await ApiClient.post('/subscriptions', subscription, token);
 
 		if (!response.ok) {
 			throw new Error('Failed to create subscription');
@@ -87,14 +70,7 @@ export class SubscriptionService {
 		subscription: UpdateSubscriptionRequest,
 		token: string
 	): Promise<Subscription> {
-		const response = await fetch(`${API_BASE_URL}/subscriptions/${id}`, {
-			method: 'PUT',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${token}`,
-			},
-			body: JSON.stringify(subscription),
-		});
+		const response = await ApiClient.put(`/subscriptions/${id}`, subscription, token);
 
 		if (!response.ok) {
 			if (response.status === 404) {
@@ -107,12 +83,7 @@ export class SubscriptionService {
 	}
 
 	static async deleteSubscription(id: string, token: string): Promise<void> {
-		const response = await fetch(`${API_BASE_URL}/subscriptions/${id}`, {
-			method: 'DELETE',
-			headers: {
-				'Authorization': `Bearer ${token}`,
-			},
-		});
+		const response = await ApiClient.delete(`/subscriptions/${id}`, token);
 
 		if (!response.ok) {
 			if (response.status === 404) {

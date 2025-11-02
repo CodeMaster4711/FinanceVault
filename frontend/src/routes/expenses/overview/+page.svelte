@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
   import { browser } from "$app/environment";
+  import { authStore } from "$lib/stores/auth";
   import Expenses from "$lib/components/expenses/expenses.svelte";
   import {
     ExpenseService,
@@ -42,13 +42,8 @@
   ];
 
   onMount(async () => {
-    if (browser) {
-      const storedToken = localStorage.getItem("token");
-      if (!storedToken) {
-        goto("/signin");
-        return;
-      }
-      token = storedToken;
+    if (browser && $authStore.isAuthenticated && $authStore.token) {
+      token = $authStore.token;
       await loadExpenses();
     }
   });

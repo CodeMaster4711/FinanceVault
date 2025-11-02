@@ -56,6 +56,7 @@ pub struct UserProfileResponse {
 pub fn users_routes() -> Router<AppState> {
     let auth_routes = Router::new()
         .route("/profile", get(get_user_profile))
+        .route("/validate-session", get(validate_session))
         .route("/logout", post(logout_user));
 
     Router::new()
@@ -245,5 +246,34 @@ pub async fn get_user_profile(
                 _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
             }
         }
+    }
+}
+
+/// Validate current session (protected)
+#[utoipa::path(
+    get,
+    path = "/api/validate-session",
+    responses(
+        (status = 200, description = "Session is valid", body = UserProfileResponse),
+        (status = 401, description = "Session is invalid or expired")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Authentication"
+)]
+pub async fn validate_session(
+    AuthenticatedUser(claims): AuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<Json<UserProfileResponse>, StatusCode> {
+    let auth_service = AuthService::new(state.db_conn.clone());
+
+    // Check if user still exists
+    match auth_service.get_user_by_id(claims.user_id).await {
+        Ok(user) => Ok(Json(UserProfileResponse {
+            id: user.id.to_string(),
+            username: user.name,
+        })),
+        Err(_) => Err(StatusCode::UNAUTHORIZED),
     }
 }

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
   import { browser } from "$app/environment";
   import { authStore } from "$lib/stores/auth";
   import * as Tabs from "$lib/components/ui/tabs/index.js";
@@ -95,19 +94,10 @@
 
   onMount(async () => {
     if (browser) {
-      // Check authentication
-      if (!$authStore.isAuthenticated) {
-        goto("/signin");
-        return;
+      // Load data if authenticated
+      if ($authStore.isAuthenticated && $authStore.token) {
+        await loadData();
       }
-
-      const token = $authStore.token;
-      if (!token) {
-        goto("/signin");
-        return;
-      }
-
-      await loadData();
     }
   });
 

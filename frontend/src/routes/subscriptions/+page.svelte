@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
   import { browser } from "$app/environment";
   import { authStore } from "$lib/stores/auth";
   import { getLocalTimeZone, today } from "@internationalized/date";
@@ -53,19 +52,10 @@
 
   onMount(async () => {
     if (browser) {
-      // Check authentication
-      if (!$authStore.isAuthenticated) {
-        goto("/signin");
-        return;
+      // Load subscriptions if authenticated
+      if ($authStore.isAuthenticated && $authStore.token) {
+        await loadSubscriptions();
       }
-
-      const token = $authStore.token;
-      if (!token) {
-        goto("/signin");
-        return;
-      }
-
-      await loadSubscriptions();
     }
   });
 

@@ -1,6 +1,4 @@
-import { PUBLIC_API_BASE_URL } from '$env/static/public';
-
-const API_BASE_URL = PUBLIC_API_BASE_URL;
+import { ApiClient } from './api-client';
 
 export interface Expense {
 	id: string;
@@ -27,11 +25,7 @@ export interface UpdateExpenseRequest {
 
 export class ExpenseService {
 	static async getExpenses(token: string): Promise<Expense[]> {
-		const response = await fetch(`${API_BASE_URL}/expenses`, {
-			headers: {
-				'Authorization': `Bearer ${token}`,
-			},
-		});
+		const response = await ApiClient.get('/expenses', token);
 
 		if (!response.ok) {
 			throw new Error('Failed to fetch expenses');
@@ -41,11 +35,7 @@ export class ExpenseService {
 	}
 
 	static async getExpense(id: string, token: string): Promise<Expense> {
-		const response = await fetch(`${API_BASE_URL}/expenses/${id}`, {
-			headers: {
-				'Authorization': `Bearer ${token}`,
-			},
-		});
+		const response = await ApiClient.get(`/expenses/${id}`, token);
 
 		if (!response.ok) {
 			if (response.status === 404) {
@@ -61,14 +51,7 @@ export class ExpenseService {
 		expense: CreateExpenseRequest,
 		token: string
 	): Promise<Expense> {
-		const response = await fetch(`${API_BASE_URL}/expenses`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${token}`,
-			},
-			body: JSON.stringify(expense),
-		});
+		const response = await ApiClient.post('/expenses', expense, token);
 
 		if (!response.ok) {
 			throw new Error('Failed to create expense');
@@ -82,14 +65,7 @@ export class ExpenseService {
 		expense: UpdateExpenseRequest,
 		token: string
 	): Promise<Expense> {
-		const response = await fetch(`${API_BASE_URL}/expenses/${id}`, {
-			method: 'PUT',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${token}`,
-			},
-			body: JSON.stringify(expense),
-		});
+		const response = await ApiClient.put(`/expenses/${id}`, expense, token);
 
 		if (!response.ok) {
 			if (response.status === 404) {
@@ -102,12 +78,7 @@ export class ExpenseService {
 	}
 
 	static async deleteExpense(id: string, token: string): Promise<void> {
-		const response = await fetch(`${API_BASE_URL}/expenses/${id}`, {
-			method: 'DELETE',
-			headers: {
-				'Authorization': `Bearer ${token}`,
-			},
-		});
+		const response = await ApiClient.delete(`/expenses/${id}`, token);
 
 		if (!response.ok) {
 			if (response.status === 404) {

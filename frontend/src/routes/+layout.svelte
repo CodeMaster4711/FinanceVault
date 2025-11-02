@@ -1,7 +1,7 @@
 <script lang="ts">
   import "../app.css";
   import favicon from "$lib/assets/favicon.svg";
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import AppSidebar from "$lib/components/navbar/app-sidebar.svelte";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
   import { Separator } from "$lib/components/ui/separator/index.js";
@@ -13,6 +13,7 @@
   } from "$lib/stores/theme";
   import { page } from "$app/stores";
   import { authStore } from "$lib/stores/auth";
+  import { ApiClient } from "$lib/services/api-client";
 
   let { data, children } = $props();
 
@@ -25,7 +26,10 @@
   // On the client we initialize the store from localStorage and
   // subscribe to the effective theme to keep the <html> class in sync.
   onMount(() => {
+    // Initialize auth store with user from server
     authStore.init(data.user);
+
+    // Initialize theme
     initThemeFromStorage();
 
     const unsub = effectiveTheme.subscribe((t) => {
@@ -45,6 +49,11 @@
     });
 
     return unsub;
+  });
+
+  onDestroy(() => {
+    // Clean up session check when component is destroyed
+    ApiClient.stopSessionCheck();
   });
 </script>
 
