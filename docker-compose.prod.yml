@@ -1,25 +1,28 @@
 version: '3.8'
 
 services:
-  frontend-prod:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
+  financevault:
+    image: ghcr.io/codemaster4711/financevault:latest
     ports:
-      - "3000:80"
-    environment:
-      - NODE_ENV=production
-
-  backend-prod:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
+      - "8000:8000"  # Backend API
+      - "3000:3000"  # Frontend
     volumes:
       - db_data:/data
     environment:
       - DATABASE_URL=sqlite:/data/finance.db
+      - JWT_SECRET=${JWT_SECRET}
+      - RUST_LOG=info
+      - NODE_ENV=production
+      - ORIGIN=http://localhost:3000
+      - PUBLIC_API_BASE_URL=http://localhost:8000/api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/ && curl -f http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   db_data:
+    driver: local
