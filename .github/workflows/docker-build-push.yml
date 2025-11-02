@@ -62,7 +62,7 @@ jobs:
           platforms: linux/amd64
 
   build-arm64:
-    runs-on: ubuntu-latest  # Using QEMU emulation (slower but works)
+    runs-on: ubuntu-latest # Using QEMU emulation (slower but works)
     permissions:
       contents: read
       packages: write
@@ -110,21 +110,6 @@ jobs:
           cache-to: type=gha,mode=max,scope=arm64
           platforms: linux/arm64
           # Note: ARM64 builds use QEMU emulation and take ~20-30min
-          # Native ARM64 builds on GitHub Actions are not currently possible
-          docker push $FIRST_TAG
-
-          # Tag and push remaining tags
-          for tag in $TAGS; do
-            if [ "$tag" != "$FIRST_TAG" ]; then
-              docker tag $FIRST_TAG $tag
-              docker push $tag
-            fi
-          done
-
-      - name: Cleanup
-        if: always()
-        run: |
-          orb stop || true
 
   create-manifest:
     needs: [build-amd64, build-arm64]
@@ -182,23 +167,4 @@ jobs:
           echo "### Run Command" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "docker run -d -p 8000:8000 -p 3000:3000 -v financevault_data:/data -e JWT_SECRET=\$(openssl rand -hex 32) ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Generate deployment summary
-        run: |
-          echo "## 🚀 Docker Image Published" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Unified FinanceVault Image (Backend + Frontend + SQLite)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Pull Command" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Run Command" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "docker run -d -p 8000:8000 -p 3000:3000 -v financevault_data:/data -e JWT_SECRET=your-secret ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
