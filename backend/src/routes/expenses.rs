@@ -2,9 +2,8 @@ use crate::{auth::middleware::AuthenticatedUser, AppState};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::{get},
-    Json,
-    Router,
+    routing::get,
+    Json, Router,
 };
 use entity::{expenses, Expenses};
 use sea_orm::prelude::Decimal;
@@ -12,7 +11,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DeleteResult, EntityTrait, QueryFil
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(serde::Deserialize, ToSchema)]
+#[derive(serde::Deserialize, ToSchema, Debug)]
 pub struct CreateExpenseRequest {
     pub description: String,
     pub amount: f64,
@@ -115,6 +114,9 @@ pub async fn create_expense(
     user: AuthenticatedUser,
     Json(payload): Json<CreateExpenseRequest>,
 ) -> Result<Json<expenses::Model>, StatusCode> {
+    tracing::info!("Creating expense for user: {}", user.0.user_id);
+    tracing::debug!("Expense payload: {:?}", payload.description);
+
     // Pre-generate UUID for SQLite compatibility
     let expense_id = Uuid::new_v4();
 
@@ -122,27 +124,44 @@ pub async fn create_expense(
         id: Set(expense_id),
         user_id: Set(user.0.user_id),
         description: Set(payload.description),
-        amount: Set(Decimal::try_from(payload.amount).map_err(|_| StatusCode::BAD_REQUEST)?),
+        amount: Set(Decimal::try_from(payload.amount).map_err(|e| {
+            tracing::error!("Failed to convert amount to Decimal: {}", e);
+            StatusCode::BAD_REQUEST
+        })?),
         date: Set(
-            chrono::NaiveDateTime::parse_from_str(&payload.date, "%Y-%m-%d %H:%M:%S")
-                .map_err(|_| StatusCode::BAD_REQUEST)?,
+            chrono::NaiveDateTime::parse_from_str(&payload.date, "%Y-%m-%d %H:%M:%S").map_err(
+                |e| {
+                    tracing::error!("Failed to parse date '{}': {}", payload.date, e);
+                    StatusCode::BAD_REQUEST
+                },
+            )?,
         ),
         category: Set(payload.category),
     };
 
-    // Insert without retrieving last_insert_id (which doesn't work with UUID PKs in SQLite)
+    // Insert without trying to get last_insert_id (doesn't work with UUID PKs in SQLite)
     Expenses::insert(new_expense)
         .exec_without_returning(&state.db_conn)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!("Failed to insert expense: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     // Fetch the created expense using the known ID
     let created = Expenses::find_by_id(expense_id)
         .one(&state.db_conn)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!("Failed to fetch created expense: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or_else(|| {
+            tracing::error!("Created expense not found after insert");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
+    tracing::info!("Expense created successfully with id: {}", created.id);
     Ok(Json(created))
 }
 
@@ -260,4 +279,3 @@ pub fn expenses_routes() -> Router<AppState> {
             get(get_expense).put(update_expense).delete(delete_expense),
         )
 }
-

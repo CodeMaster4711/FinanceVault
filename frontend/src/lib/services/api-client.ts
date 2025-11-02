@@ -2,6 +2,8 @@ import { PUBLIC_API_BASE_URL } from '$env/static/public';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { authStore } from '$lib/stores/auth';
+import { logger } from '$lib/utils/logger';
+import { get } from 'svelte/store';
 
 const API_BASE_URL = PUBLIC_API_BASE_URL;
 
@@ -11,9 +13,6 @@ export interface ApiError extends Error {
 }
 
 export class ApiClient {
-	private static sessionCheckInterval: number | null = null;
-	private static isSessionCheckRunning = false;
-
 	/**
 	 * Makes an authenticated API request with automatic error handling
 	 * and logout on 401 errors
@@ -23,15 +22,11 @@ export class ApiClient {
 		options: RequestInit = {},
 		token?: string
 	): Promise<Response> {
-		console.log(`[ApiClient] Making request to: ${url}`, { options });
+		logger.debug(`Making request to: ${url}`, { method: options.method || 'GET' });
 
 		// Get token from store if not provided
 		if (!token && browser) {
-			authStore.subscribe(state => {
-				if (state.token) {
-					token = state.token;
-				}
-			});
+			token = get(authStore).token ?? undefined;
 		}
 
 		// Add authorization header if token exists
@@ -52,28 +47,28 @@ export class ApiClient {
 		}
 
 		if (token) {
-			console.log('[ApiClient] Attaching token to request headers.');
+			logger.debug('Attaching token to request headers');
 			headers['Authorization'] = `Bearer ${token}`;
 		} else {
-			console.log('[ApiClient] No token found to attach to request.');
+			logger.warn('No token found to attach to request');
 		}
 
 		try {
-			console.log('[ApiClient] Sending fetch request...');
+			logger.debug('Sending fetch request...');
 			const response = await fetch(`${API_BASE_URL}${url}`, {
 				...options,
 				headers,
 				credentials: 'include', // Important for cookies
 			});
 
-			console.log(`[ApiClient] Received response from: ${url}`, {
+			logger.info(`Received response from: ${url}`, {
 				status: response.status,
 				statusText: response.statusText,
 			});
 
 			// Handle 401 Unauthorized - session expired or invalid
 			if (response.status === 401) {
-				console.log('[ApiClient] Received 401, logging out user');
+				logger.warn('Received 401 Unauthorized, logging out user');
 				await this.handleUnauthorized();
 				
 				const error = new Error('Unauthorized') as ApiError;
@@ -90,7 +85,7 @@ export class ApiClient {
 			}
 
 			// Network or other errors
-			console.error(`[ApiClient] API request to ${url} failed:`, error);
+			logger.error(`API request to ${url} failed`, error);
 			throw error;
 		}
 	}
@@ -148,105 +143,31 @@ export class ApiClient {
 	}
 
 	/**
-	 * Validates the current session with the backend
-	 */
-	static async validateSession(): Promise<boolean> {
-		if (!browser) return false;
-
-		const token = this.getTokenFromCookie();
-		if (!token) {
-			return false;
-		}
-
-		try {
-			const response = await this.get('/validate-session', token);
-			return response.ok;
-		} catch (error) {
-			console.error('Session validation failed:', error);
-			return false;
-		}
-	}
-
-	/**
-	 * Starts periodic session validation (every 5 minutes)
-	 */
-	static startSessionCheck() {
-		if (!browser || this.sessionCheckInterval !== null) {
-			return;
-		}
-
-		console.log('Starting periodic session validation');
-
-		// Check immediately
-		this.performSessionCheck();
-
-		// Then check every 5 minutes
-		this.sessionCheckInterval = window.setInterval(() => {
-			this.performSessionCheck();
-		}, 5 * 60 * 1000); // 5 minutes
-	}
-
-	/**
-	 * Stops periodic session validation
-	 */
-	static stopSessionCheck() {
-		if (this.sessionCheckInterval !== null) {
-			console.log('Stopping periodic session validation');
-			clearInterval(this.sessionCheckInterval);
-			this.sessionCheckInterval = null;
-		}
-	}
-
-	/**
-	 * Performs a session check
-	 */
-	private static async performSessionCheck() {
-		if (this.isSessionCheckRunning) {
-			return;
-		}
-
-		this.isSessionCheckRunning = true;
-
-		try {
-			const isValid = await this.validateSession();
-			
-			if (!isValid) {
-				console.log('Session validation failed, logging out');
-				await this.handleUnauthorized();
-			} else {
-				console.log('Session is still valid');
-			}
-		} catch (error) {
-			console.error('Error during session check:', error);
-		} finally {
-			this.isSessionCheckRunning = false;
-		}
-	}
-
-	/**
 	 * Handles unauthorized access - logs out user and redirects to signin
 	 */
 	private static async handleUnauthorized() {
-		console.log('Handling unauthorized access');
+		logger.info('Handling unauthorized access - logging out user');
 		
-		// Stop session checks
-		this.stopSessionCheck();
-
 		// Clear auth cookie
-		await fetch('/api/set-auth-cookie', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ token: null }),
-		});
+		try {
+			await fetch('/api/set-auth-cookie', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ token: null }),
+			});
+			logger.debug('Auth cookie cleared');
+		} catch (error) {
+			logger.error('Failed to clear auth cookie', error);
+		}
 
 		// Update auth store
 		authStore.logout();
+		logger.debug('Auth store updated - user logged out');
 
 		// Redirect to signin page
 		if (browser && window.location.pathname !== '/signin') {
+			logger.info('Redirecting to signin page');
 			goto('/signin');
 		}
 	}
-
-	
 }

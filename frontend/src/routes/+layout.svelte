@@ -53,10 +53,7 @@
     return unsub;
   });
 
-  onDestroy(() => {
-    // Clean up session check when component is destroyed
-    ApiClient.stopSessionCheck();
-  });
+  
 </script>
 
 <svelte:head>

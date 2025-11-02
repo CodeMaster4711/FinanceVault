@@ -22,6 +22,24 @@
   import * as Select from "$lib/components/ui/select";
   import { toast } from "svelte-sonner";
 
+  // Logging utility
+  const logger = {
+    info: (message: string, data?: any) => {
+      console.log(`[MonthlyExpenses] ${message}`, data ? data : "");
+    },
+    warn: (message: string, data?: any) => {
+      console.warn(`[MonthlyExpenses] ${message}`, data ? data : "");
+    },
+    error: (message: string, error?: any) => {
+      console.error(`[MonthlyExpenses] ${message}`, error ? error : "");
+    },
+    debug: (message: string, data?: any) => {
+      if (import.meta.env.DEV) {
+        console.debug(`[MonthlyExpenses] ${message}`, data ? data : "");
+      }
+    },
+  };
+
   type Expense = {
     id: number;
     date: string;
@@ -93,31 +111,47 @@
   ];
 
   onMount(async () => {
+    logger.info("Component mounted");
     if (browser) {
+      logger.debug("Browser environment detected");
       // Load data if authenticated
       if ($authStore.isAuthenticated && $authStore.token) {
+        logger.info("User authenticated, loading data");
         await loadData();
+      } else {
+        logger.warn("User not authenticated, skipping data load");
       }
+    } else {
+      logger.debug("SSR environment, skipping browser-specific code");
     }
   });
 
   async function loadData() {
     const token = $authStore.token;
-    if (!token) return;
+    if (!token) {
+      logger.warn("No token available for data loading");
+      return;
+    }
 
+    logger.info("Starting data load process");
     try {
       loading = true;
       const [expensesData, subscriptionsData] = await Promise.all([
         ExpenseService.getExpenses(token),
         SubscriptionService.getSubscriptions(token),
       ]);
+
+      logger.info(
+        `Data loaded successfully - Expenses: ${expensesData.length}, Subscriptions: ${subscriptionsData.length}`
+      );
       allExpenses = expensesData;
       allSubscriptions = subscriptionsData;
     } catch (error) {
-      console.error("Failed to load data:", error);
+      logger.error("Failed to load data", error);
       toast.error("Fehler beim Laden der Daten");
     } finally {
       loading = false;
+      logger.debug("Data loading process completed");
     }
   }
 
@@ -209,8 +243,15 @@
   }
 
   async function submitAddExpense() {
+    logger.info("Submitting new expense", {
+      amount: expenseFormData.amount,
+      category: expenseFormData.category,
+    });
     const token = $authStore.token;
-    if (!token) return;
+    if (!token) {
+      logger.error("No token available for expense submission");
+      return;
+    }
 
     try {
       // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
@@ -220,12 +261,17 @@
         date: dateForBackend,
       };
 
+      logger.debug("Creating expense with data", {
+        date: dateForBackend,
+        description: expenseData.description,
+      });
       await ExpenseService.createExpense(expenseData, token);
+      logger.info("Expense created successfully");
       showAddExpenseDialog = false;
       await loadData();
       toast.success("Ausgabe erfolgreich erstellt");
     } catch (error) {
-      console.error("Failed to create expense:", error);
+      logger.error("Failed to create expense", error);
       toast.error("Fehler beim Erstellen der Ausgabe");
     }
   }
@@ -247,10 +293,20 @@
   }
 
   async function submitEditExpense() {
-    if (!editingExpense) return;
+    if (!editingExpense) {
+      logger.warn("No expense selected for editing");
+      return;
+    }
 
+    logger.info("Submitting expense edit", {
+      id: editingExpense.id,
+      amount: expenseFormData.amount,
+    });
     const token = $authStore.token;
-    if (!token) return;
+    if (!token) {
+      logger.error("No token available for expense edit");
+      return;
+    }
 
     try {
       // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
@@ -260,31 +316,50 @@
         date: dateForBackend,
       };
 
+      logger.debug("Updating expense with data", {
+        date: dateForBackend,
+        description: expenseData.description,
+      });
       await ExpenseService.updateExpense(editingExpense.id, expenseData, token);
+      logger.info("Expense updated successfully", { id: editingExpense.id });
       showEditExpenseDialog = false;
       await loadData();
       toast.success("Ausgabe erfolgreich aktualisiert");
     } catch (error) {
-      console.error("Failed to update expense:", error);
+      logger.error("Failed to update expense", error);
       toast.error("Fehler beim Aktualisieren der Ausgabe");
     }
   }
 
   async function handleDeleteExpense(id: number) {
     const expense = allExpenses[expenses.findIndex((e) => e.id === id)];
-    if (!expense) return;
+    if (!expense) {
+      logger.warn("Expense not found for deletion", { id });
+      return;
+    }
 
-    if (!confirm("Möchten Sie diese Ausgabe wirklich löschen?")) return;
+    logger.info("Deleting expense", {
+      id: expense.id,
+      description: expense.description,
+    });
+    if (!confirm("Möchten Sie diese Ausgabe wirklich löschen?")) {
+      logger.info("Expense deletion cancelled by user", { id: expense.id });
+      return;
+    }
 
     const token = $authStore.token;
-    if (!token) return;
+    if (!token) {
+      logger.error("No token available for expense deletion");
+      return;
+    }
 
     try {
       await ExpenseService.deleteExpense(expense.id, token);
+      logger.info("Expense deleted successfully", { id: expense.id });
       await loadData();
       toast.success("Ausgabe erfolgreich gelöscht");
     } catch (error) {
-      console.error("Failed to delete expense:", error);
+      logger.error("Failed to delete expense", error);
       toast.error("Fehler beim Löschen der Ausgabe");
     }
   }
@@ -307,8 +382,15 @@
   }
 
   async function submitAddSubscription() {
+    logger.info("Submitting new subscription", {
+      name: subscriptionFormData.name,
+      amount: subscriptionFormData.amount,
+    });
     const token = $authStore.token;
-    if (!token) return;
+    if (!token) {
+      logger.error("No token available for subscription submission");
+      return;
+    }
 
     try {
       // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
@@ -319,12 +401,17 @@
         next_billing_date: dateForBackend,
       };
 
+      logger.debug("Creating subscription with data", {
+        name: subscriptionData.name,
+        nextBillingDate: dateForBackend,
+      });
       await SubscriptionService.createSubscription(subscriptionData, token);
+      logger.info("Subscription created successfully");
       showAddSubscriptionDialog = false;
       await loadData();
       toast.success("Abonnement erfolgreich erstellt");
     } catch (error) {
-      console.error("Failed to create subscription:", error);
+      logger.error("Failed to create subscription", error);
       toast.error("Fehler beim Erstellen des Abonnements");
     }
   }
@@ -350,10 +437,20 @@
   }
 
   async function submitEditSubscription() {
-    if (!editingSubscription) return;
+    if (!editingSubscription) {
+      logger.warn("No subscription selected for editing");
+      return;
+    }
 
+    logger.info("Submitting subscription edit", {
+      id: editingSubscription.id,
+      name: subscriptionFormData.name,
+    });
     const token = $authStore.token;
-    if (!token) return;
+    if (!token) {
+      logger.error("No token available for subscription edit");
+      return;
+    }
 
     try {
       // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
@@ -364,16 +461,23 @@
         next_billing_date: dateForBackend,
       };
 
+      logger.debug("Updating subscription with data", {
+        name: subscriptionData.name,
+        nextBillingDate: dateForBackend,
+      });
       await SubscriptionService.updateSubscription(
         editingSubscription.id,
         subscriptionData,
         token
       );
+      logger.info("Subscription updated successfully", {
+        id: editingSubscription.id,
+      });
       showEditSubscriptionDialog = false;
       await loadData();
       toast.success("Abonnement erfolgreich aktualisiert");
     } catch (error) {
-      console.error("Failed to update subscription:", error);
+      logger.error("Failed to update subscription", error);
       toast.error("Fehler beim Aktualisieren des Abonnements");
     }
   }
@@ -381,19 +485,35 @@
   async function handleDeleteSubscription(id: number) {
     const subscription =
       allSubscriptions[subscriptions.findIndex((s) => s.id === id)];
-    if (!subscription) return;
+    if (!subscription) {
+      logger.warn("Subscription not found for deletion", { id });
+      return;
+    }
 
-    if (!confirm("Möchten Sie dieses Abonnement wirklich löschen?")) return;
+    logger.info("Deleting subscription", {
+      id: subscription.id,
+      name: subscription.name,
+    });
+    if (!confirm("Möchten Sie dieses Abonnement wirklich löschen?")) {
+      logger.info("Subscription deletion cancelled by user", {
+        id: subscription.id,
+      });
+      return;
+    }
 
     const token = $authStore.token;
-    if (!token) return;
+    if (!token) {
+      logger.error("No token available for subscription deletion");
+      return;
+    }
 
     try {
       await SubscriptionService.deleteSubscription(subscription.id, token);
+      logger.info("Subscription deleted successfully", { id: subscription.id });
       await loadData();
       toast.success("Abonnement erfolgreich gelöscht");
     } catch (error) {
-      console.error("Failed to delete subscription:", error);
+      logger.error("Failed to delete subscription", error);
       toast.error("Fehler beim Löschen des Abonnements");
     }
   }

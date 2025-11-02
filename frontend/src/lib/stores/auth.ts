@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { ApiClient } from '$lib/services/api-client';
+import { logger } from '$lib/utils/logger';
 
 interface User {
 	id: string;
@@ -27,44 +28,35 @@ function createAuthStore() {
 	return {
 		subscribe,
 		init: (user: User | null, token: string | null) => {
-			console.log('[auth.ts] Initializing authStore...', { user, token });
+			logger.info('Initializing auth store', { hasUser: !!user, hasToken: !!token });
 			if (browser) {
 				if (user && token) {
-					console.log('[auth.ts] User and token found, setting auth state.');
+					logger.info('User and token found, setting authenticated state');
 					set({
 						user,
 						token,
 						isAuthenticated: true,
 						isLoading: false
 					});
-					// Start periodic session validation
-					ApiClient.startSessionCheck();
-				} else {
-					console.log('[auth.ts] No user or token, setting initial state.');
+					} else {
+					logger.debug('No user or token, setting initial state');
 					set(initialState);
-					ApiClient.stopSessionCheck();
 				}
 			}
 		},
 		login: (user: User, token: string) => {
-			console.log('[auth.ts] Logging in user:', user);
+			logger.info('Logging in user', { username: user.username, userId: user.id });
 			set({
 				user,
 				token,
 				isAuthenticated: true,
 				isLoading: false
 			});
-			// Start periodic session validation
-			if (browser) {
-				ApiClient.startSessionCheck();
-			}
+			
 		},
 		logout: () => {
-			console.log('[auth.ts] Logging out user.');
-			// Stop periodic session validation
-			if (browser) {
-				ApiClient.stopSessionCheck();
-			}
+			logger.info('Logging out user');
+			
 			// Cookie is deleted by the /api/set-auth-cookie endpoint
 			set(initialState);
 		},
