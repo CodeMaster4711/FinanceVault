@@ -14,6 +14,9 @@ RUN npm ci
 # Copy frontend source
 COPY frontend/ ./
 
+# Set build-time environment variables for SvelteKit
+ENV PUBLIC_API_BASE_URL=http://localhost:8000/api
+
 # Build frontend for production
 RUN npm run build
 
