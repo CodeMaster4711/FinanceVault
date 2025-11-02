@@ -20,7 +20,7 @@ RUN npm run build
 ###################
 # Backend Build Stage
 ###################
-FROM rust:1.70-slim AS backend-builder
+FROM rust:1.82-slim AS backend-builder
 
 WORKDIR /backend
 
