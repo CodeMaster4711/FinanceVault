@@ -71,19 +71,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker (Colima)
+      - name: Set up Docker with OrbStack
         run: |
-          # Install Colima and Docker CLI
-          brew install docker colima
+          # Install OrbStack (lightweight Docker for macOS, no VM needed)
+          brew install orbstack
 
-          # Start Colima with ARM64
-          colima start --arch aarch64 --cpu 4 --memory 8
+          # Start OrbStack
+          orb start
 
           # Wait for Docker to be ready
-          until docker info > /dev/null 2>&1; do
-            echo "Waiting for Docker..."
+          for i in {1..30}; do
+            if docker info > /dev/null 2>&1; then
+              echo "Docker is ready!"
+              break
+            fi
+            echo "Waiting for Docker... ($i/30)"
             sleep 2
           done
+
+          docker info
 
       - name: Log in to GitHub Container Registry
         run: |
@@ -120,8 +126,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          colima stop
-          colima delete -f
+          orb stop || true
 
   create-manifest:
     needs: [build-amd64, build-arm64]
