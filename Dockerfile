@@ -66,12 +66,14 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies including Node.js
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
     sqlite3 \
     curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Create directories
@@ -81,7 +83,7 @@ RUN mkdir -p /data /app/frontend
 COPY --from=backend-builder /backend/target/release/backend /app/backend
 
 # Copy frontend build from builder
-COPY --from=frontend-builder /frontend/.svelte-kit/output /app/frontend
+COPY --from=frontend-builder /frontend/build /app/frontend
 
 # Copy startup script
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh

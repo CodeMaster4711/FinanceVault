@@ -12,10 +12,10 @@ BACKEND_PID=$!
 # Wait a moment for backend to initialize
 sleep 3
 
-# Start frontend
+# Start frontend (SvelteKit with adapter-node)
 echo "🎨 Starting Frontend on port 3000..."
 cd /app/frontend
-PORT=3000 node index.js &
+PORT=3000 HOST=0.0.0.0 node index.js &
 FRONTEND_PID=$!
 
 echo "✅ Both services started successfully!"
