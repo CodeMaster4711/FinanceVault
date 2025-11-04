@@ -9,6 +9,8 @@ WORKDIR /frontend
 
 # Copy frontend package files
 COPY frontend/package*.json ./
+
+# Install ALL dependencies first (dev + production)
 RUN npm ci
 
 # Copy frontend source
@@ -20,10 +22,13 @@ ENV PUBLIC_API_BASE_URL=http://localhost:8000/api
 # Build frontend for production
 RUN npm run build
 
+# Remove devDependencies, keep only production dependencies
+RUN npm ci --omit=dev
+
 ###################
 # Backend Build Stage
 ###################
-FROM rustlang/rust:nightly-slim AS backend-builder
+FROM rustlang/rust:nightly AS backend-builder
 
 WORKDIR /backend
 
@@ -34,30 +39,11 @@ RUN apt-get update && apt-get install -y \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Cargo files for dependency caching
-COPY backend/Cargo.toml backend/Cargo.lock ./
-COPY backend/entity/Cargo.toml ./entity/Cargo.toml
-COPY backend/migration/Cargo.toml ./migration/Cargo.toml
+# Copy all backend source
+COPY backend/ ./
 
-# Create dummy source files to cache dependencies
-RUN mkdir -p src entity/src migration/src && \
-    echo "fn main() {}" > src/main.rs && \
-    echo "pub fn dummy() {}" > entity/src/lib.rs && \
-    echo "pub fn dummy() {}" > migration/src/lib.rs
-
-# Build dependencies (this layer will be cached)
-RUN cargo build --release
-
-# Remove dummy files
-RUN rm -rf src entity/src migration/src
-
-# Copy actual source code
-COPY backend/entity/src/ ./entity/src/
-COPY backend/migration/src/ ./migration/src/
-COPY backend/src/ ./src/
-
-# Build the backend (only app code, dependencies are cached)
-RUN cargo build --release
+# Build the backend
+RUN cargo build --release --verbose
 
 ###################
 # Final Runtime Stage
@@ -82,8 +68,10 @@ RUN mkdir -p /data /app/frontend
 # Copy backend binary from builder
 COPY --from=backend-builder /backend/target/release/backend /app/backend
 
-# Copy frontend build from builder
+# Copy frontend build and node_modules from builder
 COPY --from=frontend-builder /frontend/build /app/frontend
+COPY --from=frontend-builder /frontend/node_modules /app/frontend/node_modules
+COPY --from=frontend-builder /frontend/package.json /app/frontend/package.json
 
 # Copy startup script
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
@@ -101,7 +89,7 @@ ENV ORIGIN=http://localhost:3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/ && curl -f http://localhost:3000/ || exit 1
+    CMD curl -f http://localhost:8000/ || exit 1
 
 # Use entrypoint script to start both services
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
