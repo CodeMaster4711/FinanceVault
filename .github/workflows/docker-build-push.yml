@@ -76,9 +76,9 @@ jobs:
           # Install Docker
           brew install docker docker-buildx
 
-          # Install and start Colima (simplest way)
+          # Install and start Colima with QEMU (VZ doesn't work on GitHub runners)
           brew install colima
-          colima start --cpu 4 --memory 8
+          colima start --cpu 4 --memory 8 --vm-type=qemu --arch aarch64
 
           # Wait for Docker to be ready
           sleep 10
