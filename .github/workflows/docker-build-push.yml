@@ -62,7 +62,7 @@ jobs:
           platforms: linux/amd64
 
   build-arm64:
-    runs-on: macos-14 # macOS ARM64 runner
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -71,22 +71,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker
-        run: |
-          # Install Docker
-          brew install docker docker-buildx
+      - name: Set up QEMU (for ARM64 emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm64
 
-          # Install and start Colima with QEMU (VZ doesn't work on GitHub runners)
-          brew install colima
-          colima start --cpu 4 --memory 8 --vm-type=qemu --arch aarch64
-
-          # Wait for Docker to be ready
-          sleep 10
-          docker version
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
 
       - name: Log in to GitHub Container Registry
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
@@ -101,27 +103,18 @@ jobs:
             type=sha,prefix={{branch}}-,suffix=-arm64
 
       - name: Build and push ARM64 image
-        run: |
-          # Get all tags
-          TAGS="${{ steps.meta.outputs.tags }}"
-
-          # Build for ARM64
-          DOCKER_TAGS=""
-          for tag in $TAGS; do
-            DOCKER_TAGS="$DOCKER_TAGS -t $tag"
-          done
-
-          docker build $DOCKER_TAGS --platform linux/arm64 -f ./Dockerfile .
-
-          # Push all tags
-          for tag in $TAGS; do
-            docker push $tag
-          done
-
-      - name: Cleanup
-        if: always()
-        run: |
-          colima stop || true
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/arm64
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
   create-manifest:
     needs: [build-amd64, build-arm64]
