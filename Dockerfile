@@ -85,7 +85,7 @@ ENV DATABASE_URL=sqlite:/data/finance.db
 ENV RUST_LOG=info
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV ORIGIN=http://localhost:3000
+ENV FRONTEND_URL=http://localhost:3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

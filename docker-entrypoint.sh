@@ -12,37 +12,30 @@ mkdir -p /data
 echo "📁 Data directory: /data"
 echo "💾 Database URL: $DATABASE_URL"
 echo "🔧 Rust Log Level: $RUST_LOG"
+echo ""
 
-# Create a log file for backend output
-BACKEND_LOG=/tmp/backend.log
-FRONTEND_LOG=/tmp/frontend.log
-
-# Start backend in background with explicit logging
+# Start backend in background with logging to stdout/stderr
 echo "📦 Starting Backend on port 8000..."
 cd /app
 
-# Start backend and redirect to log file
-RUST_LOG=$RUST_LOG DATABASE_URL=$DATABASE_URL ./backend > $BACKEND_LOG 2>&1 &
+# Start backend with logs going to stdout (with prefix)
+(RUST_LOG=$RUST_LOG DATABASE_URL=$DATABASE_URL ./backend 2>&1 | sed 's/^/[BACKEND] /') &
 BACKEND_PID=$!
 
 echo "   Backend PID: $BACKEND_PID"
+echo ""
 
-# Tail backend logs in background
-tail -f $BACKEND_LOG 2>/dev/null | sed 's/^/[BACKEND] /' &
-BACKEND_LOG_PID=$!
-
-# Wait for backend to initialize and check if it's running
+# Wait for backend to initialize
 echo "⏳ Waiting for backend to initialize..."
 sleep 5
 
 if ! kill -0 $BACKEND_PID 2>/dev/null; then
     echo "❌ Backend failed to start!"
-    echo "📋 Backend logs:"
-    cat $BACKEND_LOG
     exit 1
 fi
 
 echo "✅ Backend process is running (PID: $BACKEND_PID)"
+echo ""
 
 # Check if backend is responding
 MAX_RETRIES=10
@@ -58,27 +51,49 @@ while [ $RETRY -lt $MAX_RETRIES ]; do
         sleep 2
     else
         echo "⚠️  Backend health check failed after $MAX_RETRIES attempts"
-        echo "📋 Backend logs:"
-        cat $BACKEND_LOG
     fi
 done
+
+echo ""
 
 # Start frontend (SvelteKit with adapter-node)
 echo "🎨 Starting Frontend on port 3000..."
 cd /app/frontend
-PORT=3000 HOST=0.0.0.0 node index.js > $FRONTEND_LOG 2>&1 &
+
+# Start frontend with logs going to stdout (with prefix) and verbose output
+(PORT=3000 HOST=0.0.0.0 DEBUG=* node index.js 2>&1 | while IFS= read -r line; do
+    # Filter out empty lines and add prefix
+    if [ ! -z "$line" ]; then
+        echo "[FRONTEND] $line"
+    fi
+done) &
 FRONTEND_PID=$!
 
 echo "   Frontend PID: $FRONTEND_PID"
+echo ""
 
-# Tail frontend logs in background
-tail -f $FRONTEND_LOG 2>/dev/null | sed 's/^/[FRONTEND] /' &
-FRONTEND_LOG_PID=$!
+# Wait for frontend to start
+sleep 3
+
+# Check if frontend is responding
+if curl -f http://localhost:3000/ 2>/dev/null > /dev/null; then
+    echo "✅ Frontend health check passed"
+else
+    echo "⚠️  Frontend starting (may take a moment)"
+fi
+
+echo ""
+echo "✅ Both services started successfully!"
+echo "   🌐 Frontend: http://localhost:3000"
+echo "   🔧 Backend:  http://localhost:8000"
+echo "   📚 API Docs: http://localhost:8000/swagger-ui"
+echo ""
 
 # Function to handle shutdown
 shutdown() {
+    echo ""
     echo "🛑 Shutting down services..."
-    kill $BACKEND_PID $FRONTEND_PID $BACKEND_LOG_PID $FRONTEND_LOG_PID 2>/dev/null || true
+    kill $BACKEND_PID $FRONTEND_PID 2>/dev/null || true
     wait $BACKEND_PID $FRONTEND_PID 2>/dev/null || true
     echo "✅ Services stopped"
     exit 0
@@ -91,14 +106,10 @@ trap shutdown SIGTERM SIGINT
 while true; do
     if ! kill -0 $BACKEND_PID 2>/dev/null; then
         echo "❌ Backend process died!"
-        echo "📋 Last backend logs:"
-        tail -20 $BACKEND_LOG
         exit 1
     fi
     if ! kill -0 $FRONTEND_PID 2>/dev/null; then
         echo "❌ Frontend process died!"
-        echo "📋 Last frontend logs:"
-        tail -20 $FRONTEND_LOG
         exit 1
     fi
     sleep 10

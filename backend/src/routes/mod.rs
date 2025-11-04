@@ -16,7 +16,9 @@ pub mod users;
 /// Creates the main application router and logs all registered routes.
 pub fn create_router() -> Router<AppState> {
     let frontend_url =
-        std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+        std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+
+    tracing::info!("CORS configured for frontend URL: {}", frontend_url);
 
     // a permissive CORS layer is used for development
     let cors = CorsLayer::new()
