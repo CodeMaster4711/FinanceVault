@@ -62,7 +62,7 @@ jobs:
           platforms: linux/amd64
 
   build-arm64:
-    runs-on: macos-latest # Native ARM64 runner (much faster!)
+    runs-on: macos-14 # macOS ARM64 runner
     permissions:
       contents: read
       packages: write
@@ -71,19 +71,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker (Colima)
+      - name: Set up Docker
         run: |
-          # Install Homebrew dependencies
-          brew install docker docker-buildx colima
+          # Install Docker
+          brew install docker docker-buildx
 
-          # Start Colima with ARM64 support
-          colima start --arch aarch64 --vm-type=vz --vz-rosetta --mount-type=virtiofs
+          # Install and start Colima (simplest way)
+          brew install colima
+          colima start --cpu 4 --memory 8
 
-          # Configure Docker context
-          docker context use colima
-
-          # Verify Docker is working
-          docker info
+          # Wait for Docker to be ready
+          sleep 10
+          docker version
 
       - name: Log in to GitHub Container Registry
         run: |
@@ -103,17 +102,21 @@ jobs:
 
       - name: Build and push ARM64 image
         run: |
-          # Build the image
-          docker buildx create --use --name arm64-builder || true
-          docker buildx build \
-            --platform linux/arm64 \
-            --push \
-            --cache-from type=gha,scope=arm64 \
-            --cache-to type=gha,mode=max,scope=arm64 \
-            --file ./Dockerfile \
-            --tag $(echo "${{ steps.meta.outputs.tags }}" | head -n1) \
-            $(echo "${{ steps.meta.outputs.tags }}" | tail -n +2 | sed 's/^/--tag /') \
-            .
+          # Get all tags
+          TAGS="${{ steps.meta.outputs.tags }}"
+
+          # Build for ARM64
+          DOCKER_TAGS=""
+          for tag in $TAGS; do
+            DOCKER_TAGS="$DOCKER_TAGS -t $tag"
+          done
+
+          docker build $DOCKER_TAGS --platform linux/arm64 -f ./Dockerfile .
+
+          # Push all tags
+          for tag in $TAGS; do
+            docker push $tag
+          done
 
       - name: Cleanup
         if: always()
