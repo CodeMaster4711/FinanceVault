@@ -62,7 +62,7 @@ jobs:
           platforms: linux/amd64
 
   build-arm64:
-    runs-on: ubuntu-latest # Using QEMU emulation (slower but works)
+    runs-on: macos-latest # Native ARM64 runner (much faster!)
     permissions:
       contents: read
       packages: write
@@ -71,20 +71,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
+      - name: Set up Docker (Colima)
+        run: |
+          # Install Homebrew dependencies
+          brew install docker docker-buildx colima
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+          # Start Colima with ARM64 support
+          colima start --arch aarch64 --vm-type=vz --vz-rosetta --mount-type=virtiofs
+
+          # Configure Docker context
+          docker context use colima
+
+          # Verify Docker is working
+          docker info
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
       - name: Extract metadata
         id: meta
@@ -99,17 +102,23 @@ jobs:
             type=sha,prefix={{branch}}-,suffix=-arm64
 
       - name: Build and push ARM64 image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=arm64
-          cache-to: type=gha,mode=max,scope=arm64
-          platforms: linux/arm64
-          # Note: ARM64 builds use QEMU emulation and take ~20-30min
+        run: |
+          # Build the image
+          docker buildx create --use --name arm64-builder || true
+          docker buildx build \
+            --platform linux/arm64 \
+            --push \
+            --cache-from type=gha,scope=arm64 \
+            --cache-to type=gha,mode=max,scope=arm64 \
+            --file ./Dockerfile \
+            --tag $(echo "${{ steps.meta.outputs.tags }}" | head -n1) \
+            $(echo "${{ steps.meta.outputs.tags }}" | tail -n +2 | sed 's/^/--tag /') \
+            .
+
+      - name: Cleanup
+        if: always()
+        run: |
+          colima stop || true
 
   create-manifest:
     needs: [build-amd64, build-arm64]
