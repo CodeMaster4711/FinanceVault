@@ -38,11 +38,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch,suffix=-amd64
-            type=ref,event=pr,suffix=-amd64
             type=semver,pattern={{version}},suffix=-amd64
             type=semver,pattern={{major}}.{{minor}},suffix=-amd64
-            type=sha,prefix={{branch}}-,suffix=-amd64
+            type=semver,pattern={{major}},suffix=-amd64
+            type=raw,value=latest-amd64,enable={{is_default_branch}}
 
       - name: Build and push AMD64 image
         uses: docker/build-push-action@v5
@@ -91,11 +90,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch,suffix=-arm64
-            type=ref,event=pr,suffix=-arm64
             type=semver,pattern={{version}},suffix=-arm64
             type=semver,pattern={{major}}.{{minor}},suffix=-arm64
-            type=sha,prefix={{branch}}-,suffix=-arm64
+            type=semver,pattern={{major}},suffix=-arm64
+            type=raw,value=latest-arm64,enable={{is_default_branch}}
 
       - name: Build and push ARM64 image
         uses: docker/build-push-action@v5
@@ -132,11 +130,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Create and push multi-arch manifest
