@@ -1,6 +1,6 @@
 {
   "name": "financevault",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "A secure financial management application with end-to-end encryption",
   "repository": {
