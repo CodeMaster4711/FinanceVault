@@ -19,11 +19,21 @@ jobs:
     uses: ./.github/workflows/release.yml
     secrets: inherit
 
-  # Step 2: Summary
+  # Step 2: Docker Build (only if new release was created)
+  docker-build:
+    name: 🐳 Docker Build & Push
+    needs: release
+    if: needs.release.outputs.new_release_published == 'true'
+    uses: ./.github/workflows/docker-build-push.yml
+    secrets: inherit
+    with:
+      version: ${{ needs.release.outputs.new_release_version }}
+
+  # Step 3: Summary
   summary:
-    name: 📊 Release Summary
+    name: 📊 Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [release]
+    needs: [release, docker-build]
     if: always()
     steps:
       - name: Generate Summary
@@ -33,13 +43,9 @@ jobs:
 
           if [ "${{ needs.release.outputs.new_release_published }}" == "true" ]; then
             echo "✅ **Release Created:** v${{ needs.release.outputs.new_release_version }}" >> $GITHUB_STEP_SUMMARY
-            echo "🏷️ **Git Tag:** v${{ needs.release.outputs.new_release_version }}" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Docker Build:** Completed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 🐳 Docker Build" >> $GITHUB_STEP_SUMMARY
-            echo "The Docker build will be triggered automatically by the git tag." >> $GITHUB_STEP_SUMMARY
-            echo "Check the [docker-build-push workflow](../actions/workflows/docker-build-push.yml) for progress." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 🚀 After Docker Build Completes:" >> $GITHUB_STEP_SUMMARY
+            echo "### 🚀 New Version Available!" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
             echo "docker pull ghcr.io/codemaster4711/financevault:${{ needs.release.outputs.new_release_version }}" >> $GITHUB_STEP_SUMMARY
             echo "# or" >> $GITHUB_STEP_SUMMARY

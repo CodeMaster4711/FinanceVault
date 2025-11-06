@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_call:
+    inputs:
+      version:
+        description: "Version to tag the Docker images (e.g. 1.2.3)"
+        required: false
+        type: string
   workflow_dispatch:
 
 env:
@@ -41,6 +46,7 @@ jobs:
             type=semver,pattern={{version}},suffix=-amd64
             type=semver,pattern={{major}}.{{minor}},suffix=-amd64
             type=semver,pattern={{major}},suffix=-amd64
+            type=raw,value=${{ inputs.version }}-amd64,enable=${{ inputs.version != '' }}
             type=raw,value=latest-amd64,enable={{is_default_branch}}
 
       - name: Build and push AMD64 image
@@ -93,6 +99,7 @@ jobs:
             type=semver,pattern={{version}},suffix=-arm64
             type=semver,pattern={{major}}.{{minor}},suffix=-arm64
             type=semver,pattern={{major}},suffix=-arm64
+            type=raw,value=${{ inputs.version }}-arm64,enable=${{ inputs.version != '' }}
             type=raw,value=latest-arm64,enable={{is_default_branch}}
 
       - name: Build and push ARM64 image
@@ -133,6 +140,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Create and push multi-arch manifest
