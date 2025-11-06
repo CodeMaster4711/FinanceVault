@@ -13,7 +13,6 @@ devenv.local.nix
 
 /postgres/
 
-Cargo.lock
 
 finance.db
 

@@ -1,6 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 interface User {
     id: string;
@@ -14,6 +14,7 @@ export const load: LayoutServerLoad = async ({ cookies }) => {
     if (token) {
         console.log('[+layout.server.ts] Auth token found:', token.substring(0, 15) + '...');
         try {
+            const JWT_SECRET = env.JWT_SECRET;
             if (!JWT_SECRET) {
                 console.error('[+layout.server.ts] JWT_SECRET is not defined!');
                 cookies.delete('auth_token', { path: '/' });
