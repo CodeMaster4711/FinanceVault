@@ -1,9 +1,14 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
+    outputs:
+      new_release_published:
+        description: "Whether a new release was published"
+        value: ${{ jobs.release.outputs.new_release_published }}
+      new_release_version:
+        description: "Version of the new release"
+        value: ${{ jobs.release.outputs.new_release_version }}
   workflow_dispatch:
 
 permissions:

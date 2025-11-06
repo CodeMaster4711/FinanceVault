@@ -4,7 +4,62 @@
 
 Dein FinanceVault Projekt ist jetzt mit einem vollautomatischen Release- und Build-Workflow ausgestattet!
 
-## 🔄 So funktioniert es
+## 🔄 Workflow-Struktur
+
+### 📋 `main-release.yml` - Haupt-Orchestrator
+
+Die Hauptpipeline, die alles steuert:
+
+```
+main-release.yml
+    │
+    ├──> 1. release.yml (Semantic Release)
+    │       └── Erstellt neue Version & Git Tag
+    │
+    └──> 2. docker-build-push.yml (nur wenn Release erstellt wurde)
+            └── Baut & pushed Docker Images mit der neuen Version
+```
+
+**Trigger:** Push auf `main` Branch
+
+**Workflow:**
+
+1. ✅ Führt `release.yml` aus → Erstellt neues Release
+2. ✅ Wenn Release erfolgreich → Führt `docker-build-push.yml` aus
+3. ✅ Zeigt Zusammenfassung mit Pull-Command
+
+### 📦 `release.yml` - Semantic Release
+
+**Was macht es:**
+
+- Analysiert Commits (Conventional Commits)
+- Bestimmt neue Version (major/minor/patch)
+- Erstellt CHANGELOG.md
+- Updated Versionen in `package.json`, `frontend/package.json`, `backend/Cargo.toml`
+- Erstellt Git Tag (z.B. `v1.2.3`)
+- Erstellt GitHub Release
+
+**Output:**
+
+- `new_release_published` - `true` wenn neues Release erstellt wurde
+- `new_release_version` - Die neue Version (z.B. `1.2.3`)
+
+### 🐳 `docker-build-push.yml` - Docker Build
+
+**Was macht es:**
+
+- Baut AMD64 und ARM64 Images
+- Erstellt Multi-Arch Manifest
+- Pushed zu GitHub Container Registry
+
+**Tags:** (z.B. für Version 1.2.3)
+
+- `ghcr.io/codemaster4711/financevault:1.2.3`
+- `ghcr.io/codemaster4711/financevault:1.2`
+- `ghcr.io/codemaster4711/financevault:1`
+- `ghcr.io/codemaster4711/financevault:latest`
+
+## 🎯 So funktioniert es
 
 ### 1️⃣ Code entwickeln und committen
 
@@ -78,16 +133,16 @@ docker pull ghcr.io/codemaster4711/financevault:latest
 
 ### Commit Types
 
-| Type | Effekt | Beispiel |
-|------|--------|----------|
-| `feat:` | MINOR bump | `feat(auth): add OAuth2` |
-| `fix:` | PATCH bump | `fix(api): correct calculation` |
-| `perf:` | PATCH bump | `perf(db): optimize query` |
-| `refactor:` | PATCH bump | `refactor(ui): restructure` |
-| `build:` | PATCH bump | `build(docker): update base` |
-| `docs:` | Kein Release | `docs(readme): update guide` |
-| `test:` | Kein Release | `test(api): add tests` |
-| `chore:` | Kein Release | `chore(deps): update deps` |
+| Type        | Effekt       | Beispiel                        |
+| ----------- | ------------ | ------------------------------- |
+| `feat:`     | MINOR bump   | `feat(auth): add OAuth2`        |
+| `fix:`      | PATCH bump   | `fix(api): correct calculation` |
+| `perf:`     | PATCH bump   | `perf(db): optimize query`      |
+| `refactor:` | PATCH bump   | `refactor(ui): restructure`     |
+| `build:`    | PATCH bump   | `build(docker): update base`    |
+| `docs:`     | Kein Release | `docs(readme): update guide`    |
+| `test:`     | Kein Release | `test(api): add tests`          |
+| `chore:`    | Kein Release | `chore(deps): update deps`      |
 
 ### Breaking Changes
 
@@ -128,6 +183,7 @@ chmod +x .github/scripts/test-update-versions.sh
 **Problem:** Nach Merge in `main` passiert nichts
 
 **Lösung:**
+
 1. Prüfe ob Commits das richtige Format haben
 2. Check GitHub Actions Log
 3. Mindestens ein `feat:`, `fix:`, etc. Commit muss vorhanden sein
@@ -137,6 +193,7 @@ chmod +x .github/scripts/test-update-versions.sh
 **Problem:** Build-Fehler im Docker Workflow
 
 **Lösung:**
+
 1. Check `docker-build-push.yml` Actions Log
 2. Teste Build lokal: `docker build -t test .`
 
@@ -145,6 +202,7 @@ chmod +x .github/scripts/test-update-versions.sh
 **Problem:** Versionen in Dateien nicht aktualisiert
 
 **Lösung:**
+
 1. Check `release.yml` Actions Log
 2. Teste Update-Script lokal: `.github/scripts/test-update-versions.sh`
 
