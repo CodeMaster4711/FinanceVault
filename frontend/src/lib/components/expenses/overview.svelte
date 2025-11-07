@@ -1,6 +1,9 @@
 <script lang="ts">
   import * as Card from "$lib/components/ui/card/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
+  import ExpensesType from "$lib/components/expenses/charts/expenses-type.svelte";
+  import ExpensesTrend from "$lib/components/expenses/charts/expenses-trend.svelte";
+  import ExpensesComparison from "$lib/components/expenses/charts/expenses-comparison.svelte";
 
   type Props = {
     totalExpenses: number;
@@ -23,6 +26,24 @@
     categoryTotals,
     expenses,
   }: Props = $props();
+
+  // Filtere nur einmalige Ausgaben für das Kategorie-Diagramm
+  const expenseCategories = $derived(() => {
+    const filtered = Object.fromEntries(
+      Object.entries(categoryTotals).filter(([key]) => key !== "Subscriptions")
+    );
+    return Object.keys(filtered).length > 0 ? filtered : categoryTotals;
+  });
+
+  // Bereite Ausgaben für Trend-Chart vor (letzte 30 Tage)
+  const recentExpenses = $derived(() => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    return expenses
+      .filter((expense) => new Date(expense.date) >= thirtyDaysAgo)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  });
 </script>
 
 <div class="space-y-6">
@@ -155,5 +176,26 @@
         </div>
       </Card.Content>
     </Card.Root>
+  </div>
+
+  <!-- Diagramm-Sektion -->
+  <div class="grid gap-4 lg:grid-cols-3 md:grid-cols-2">
+    <ExpensesType
+      categoryTotals={expenseCategories()}
+      title="Kategorieverteilung"
+      description="Ausgaben nach Kategorien"
+    />
+    <ExpensesTrend
+      expenses={recentExpenses()}
+      title="30-Tage Trend"
+      description="Ausgabenverlauf der letzten 30 Tage"
+    />
+    <ExpensesComparison
+      {totalExpenses}
+      {totalSubscriptions}
+      {monthlyTotal}
+      title="Ausgabenvergleich"
+      description="Einmalig vs. Subscriptions"
+    />
   </div>
 </div>
