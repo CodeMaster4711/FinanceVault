@@ -2,6 +2,13 @@
 
 All notable changes to FinanceVault will be documented in this file.
 
+# [0.1.0](https://github.com/CodeMaster4711/FinanceVault/compare/v0.0.3...v0.1.0) (2025-11-07)
+
+
+### Features
+
+* added expenses overview dashabord and other small changes ([6732a96](https://github.com/CodeMaster4711/FinanceVault/commit/6732a96907e78cabc47bcea3e6330e73b8dfcc30))
+
 ## [0.0.3](https://github.com/CodeMaster4711/FinanceVault/compare/v0.0.2...v0.0.3) (2025-11-07)
 
 ## [0.0.2](https://github.com/CodeMaster4711/FinanceVault/compare/v0.0.1...v0.0.2) (2025-11-06)
