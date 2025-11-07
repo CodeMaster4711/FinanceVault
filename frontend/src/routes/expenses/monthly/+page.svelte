@@ -6,6 +6,7 @@
   import { CalendarDate } from "@internationalized/date";
   import Overview from "$lib/components/expenses/overview.svelte";
   import Expenses from "$lib/components/expenses/expenses.svelte";
+  import ExpensesWithFilters from "$lib/components/expenses/expenses-with-filters.svelte";
   import Subscriptions from "$lib/components/expenses/subscritpions.svelte";
   import {
     ExpenseService,
@@ -59,6 +60,12 @@
   let loading = $state(true);
   let allExpenses: ExpenseType[] = $state([]);
   let allSubscriptions: SubscriptionType[] = $state([]);
+
+  // Filter states
+  let selectedMonth = $state(new Date().getMonth() + 1); // 1-12
+  let selectedYear = $state(new Date().getFullYear());
+  let selectedCategory = $state("all");
+  let amountSearch = $state("");
 
   // Dialog states
   let showAddExpenseDialog = $state(false);
@@ -114,15 +121,23 @@
     logger.info("Component mounted");
     if (browser) {
       logger.debug("Browser environment detected");
-      // Load data if authenticated
-      if ($authStore.isAuthenticated && $authStore.token) {
-        logger.info("User authenticated, loading data");
-        await loadData();
-      } else {
-        logger.warn("User not authenticated, skipping data load");
-      }
+      // Initial load will be handled by the reactive statement below
     } else {
       logger.debug("SSR environment, skipping browser-specific code");
+    }
+  });
+
+  // Reactive statement to load data when auth state is ready
+  $effect(() => {
+    if (browser && $authStore.isAuthenticated && $authStore.token) {
+      logger.info("Auth state ready, loading data");
+      loadData();
+    } else if (browser && !$authStore.isAuthenticated) {
+      logger.warn("User not authenticated");
+      // Reset data when user is not authenticated
+      allExpenses = [];
+      allSubscriptions = [];
+      loading = false;
     }
   });
 
@@ -155,16 +170,27 @@
     }
   }
 
-  // Filter expenses for current month
+  // Filter expenses for selected month/year and apply category/amount filters
   let expenses = $derived(
     allExpenses
       .filter((exp) => {
         const expDate = new Date(exp.date);
-        const now = new Date();
-        return (
-          expDate.getMonth() === now.getMonth() &&
-          expDate.getFullYear() === now.getFullYear()
-        );
+        const monthMatches = expDate.getMonth() + 1 === selectedMonth;
+        const yearMatches = expDate.getFullYear() === selectedYear;
+        const categoryMatches =
+          selectedCategory === "all" || exp.category === selectedCategory;
+
+        let amountMatches = true;
+        if (amountSearch.trim()) {
+          const searchAmount = parseFloat(amountSearch);
+          if (!isNaN(searchAmount)) {
+            const expAmount = parseFloat(exp.amount.toString());
+            // Exact match or within 0.01 tolerance for floating point comparison
+            amountMatches = Math.abs(expAmount - searchAmount) < 0.01;
+          }
+        }
+
+        return monthMatches && yearMatches && categoryMatches && amountMatches;
       })
       .map((e) => ({
         id: parseInt(e.id.replace(/-/g, "").slice(0, 8), 16),
@@ -240,6 +266,23 @@
       category: "Lebensmittel",
     };
     showAddExpenseDialog = true;
+  }
+
+  // Filter handlers
+  function handleMonthChange(month: number) {
+    selectedMonth = month;
+  }
+
+  function handleYearChange(year: number) {
+    selectedYear = year;
+  }
+
+  function handleCategoryChange(category: string) {
+    selectedCategory = category;
+  }
+
+  function handleAmountSearchChange(amount: string) {
+    amountSearch = amount;
   }
 
   async function submitAddExpense() {
@@ -534,18 +577,28 @@
         {totalSubscriptions}
         {monthlyTotal}
         {categoryTotals}
+        {selectedMonth}
+        {selectedYear}
         {expenses}
       />
     </Tabs.Content>
 
     <!-- Expenses Tab -->
     <Tabs.Content value="expenses" class="flex-1">
-      <Expenses
+      <ExpensesWithFilters
         {expenses}
+        {selectedMonth}
+        {selectedYear}
+        {selectedCategory}
+        {amountSearch}
         onAddExpense={handleAddExpense}
         onUploadFile={handleUploadFile}
         onEditExpense={handleEditExpense}
         onDeleteExpense={handleDeleteExpense}
+        onMonthChange={handleMonthChange}
+        onYearChange={handleYearChange}
+        onCategoryChange={handleCategoryChange}
+        onAmountSearchChange={handleAmountSearchChange}
       />
     </Tabs.Content>
 

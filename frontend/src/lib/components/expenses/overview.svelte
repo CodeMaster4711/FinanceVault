@@ -1,12 +1,17 @@
 <script lang="ts">
   import * as Card from "$lib/components/ui/card/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
+  import ExpensesType from "$lib/components/expenses/charts/expenses-type.svelte";
+  import ExpensesTrend from "$lib/components/expenses/charts/expenses-trend.svelte";
+  import ExpensesComparison from "$lib/components/expenses/charts/expenses-comparison.svelte";
 
   type Props = {
     totalExpenses: number;
     totalSubscriptions: number;
     monthlyTotal: number;
     categoryTotals: Record<string, number>;
+    selectedMonth: number;
+    selectedYear: number;
     expenses: Array<{
       id: number;
       date: string;
@@ -21,8 +26,48 @@
     totalSubscriptions,
     monthlyTotal,
     categoryTotals,
+    selectedMonth,
+    selectedYear,
     expenses,
   }: Props = $props();
+
+  // Get month name
+  const months = [
+    "Januar",
+    "Februar",
+    "März",
+    "April",
+    "Mai",
+    "Juni",
+    "Juli",
+    "August",
+    "September",
+    "Oktober",
+    "November",
+    "Dezember",
+  ];
+
+  const getMonthName = (monthNum: number) => {
+    return months[monthNum - 1] || `Monat ${monthNum}`;
+  };
+
+  // Filtere nur einmalige Ausgaben für das Kategorie-Diagramm
+  const expenseCategories = $derived(() => {
+    const filtered = Object.fromEntries(
+      Object.entries(categoryTotals).filter(([key]) => key !== "Subscriptions")
+    );
+    return Object.keys(filtered).length > 0 ? filtered : categoryTotals;
+  });
+
+  // Bereite Ausgaben für Trend-Chart vor (letzte 30 Tage)
+  const recentExpenses = $derived(() => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    return expenses
+      .filter((expense) => new Date(expense.date) >= thirtyDaysAgo)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  });
 </script>
 
 <div class="space-y-6">
@@ -47,7 +92,10 @@
       </Card.Header>
       <Card.Content>
         <div class="text-2xl font-bold">€{totalExpenses.toFixed(2)}</div>
-        <p class="text-xs text-muted-foreground">Einmalige Ausgaben</p>
+        <p class="text-xs text-muted-foreground">
+          {getMonthName(selectedMonth)}
+          {selectedYear}
+        </p>
       </Card.Content>
     </Card.Root>
 
@@ -100,7 +148,10 @@
       </Card.Header>
       <Card.Content>
         <div class="text-2xl font-bold">€{monthlyTotal.toFixed(2)}</div>
-        <p class="text-xs text-muted-foreground">Diesen Monat</p>
+        <p class="text-xs text-muted-foreground">
+          {getMonthName(selectedMonth)}
+          {selectedYear}
+        </p>
       </Card.Content>
     </Card.Root>
   </div>
@@ -155,5 +206,26 @@
         </div>
       </Card.Content>
     </Card.Root>
+  </div>
+
+  <!-- Diagramm-Sektion -->
+  <div class="grid gap-4 lg:grid-cols-3 md:grid-cols-2">
+    <ExpensesType
+      categoryTotals={expenseCategories()}
+      title="Kategorieverteilung"
+      description="Ausgaben nach Kategorien"
+    />
+    <ExpensesTrend
+      expenses={recentExpenses()}
+      title="30-Tage Trend"
+      description="Ausgabenverlauf der letzten 30 Tage"
+    />
+    <ExpensesComparison
+      {totalExpenses}
+      {totalSubscriptions}
+      {monthlyTotal}
+      title="Ausgabenvergleich"
+      description="Einmalig vs. Subscriptions"
+    />
   </div>
 </div>
