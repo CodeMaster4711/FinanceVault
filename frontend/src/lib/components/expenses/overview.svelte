@@ -10,6 +10,8 @@
     totalSubscriptions: number;
     monthlyTotal: number;
     categoryTotals: Record<string, number>;
+    selectedMonth: number;
+    selectedYear: number;
     expenses: Array<{
       id: number;
       date: string;
@@ -24,8 +26,30 @@
     totalSubscriptions,
     monthlyTotal,
     categoryTotals,
+    selectedMonth,
+    selectedYear,
     expenses,
   }: Props = $props();
+
+  // Get month name
+  const months = [
+    "Januar",
+    "Februar",
+    "März",
+    "April",
+    "Mai",
+    "Juni",
+    "Juli",
+    "August",
+    "September",
+    "Oktober",
+    "November",
+    "Dezember",
+  ];
+
+  const getMonthName = (monthNum: number) => {
+    return months[monthNum - 1] || `Monat ${monthNum}`;
+  };
 
   // Filtere nur einmalige Ausgaben für das Kategorie-Diagramm
   const expenseCategories = $derived(() => {
@@ -68,7 +92,10 @@
       </Card.Header>
       <Card.Content>
         <div class="text-2xl font-bold">€{totalExpenses.toFixed(2)}</div>
-        <p class="text-xs text-muted-foreground">Einmalige Ausgaben</p>
+        <p class="text-xs text-muted-foreground">
+          {getMonthName(selectedMonth)}
+          {selectedYear}
+        </p>
       </Card.Content>
     </Card.Root>
 
@@ -121,7 +148,10 @@
       </Card.Header>
       <Card.Content>
         <div class="text-2xl font-bold">€{monthlyTotal.toFixed(2)}</div>
-        <p class="text-xs text-muted-foreground">Diesen Monat</p>
+        <p class="text-xs text-muted-foreground">
+          {getMonthName(selectedMonth)}
+          {selectedYear}
+        </p>
       </Card.Content>
     </Card.Root>
   </div>

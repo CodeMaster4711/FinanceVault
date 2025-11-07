@@ -3,6 +3,7 @@
   import { browser } from "$app/environment";
   import { authStore } from "$lib/stores/auth";
   import Expenses from "$lib/components/expenses/expenses.svelte";
+  import ExpensesWithFilters from "$lib/components/expenses/expenses-with-filters.svelte";
   import {
     ExpenseService,
     type Expense,
@@ -15,9 +16,15 @@
   import * as Select from "$lib/components/ui/select";
   import { toast } from "svelte-sonner";
 
-  let expenses: Expense[] = $state([]);
+  let allExpenses: Expense[] = $state([]);
   let loading = $state(true);
   let token = $state("");
+
+  // Filter states
+  let selectedMonth = $state(new Date().getMonth() + 1); // 1-12
+  let selectedYear = $state(new Date().getFullYear());
+  let selectedCategory = $state("all");
+  let amountSearch = $state("");
 
   // Dialog state
   let showAddDialog = $state(false);
@@ -42,16 +49,27 @@
   ];
 
   onMount(async () => {
+    if (browser) {
+      // Initial load will be handled by the reactive statement below
+    }
+  });
+
+  // Reactive statement to load data when auth state is ready
+  $effect(() => {
     if (browser && $authStore.isAuthenticated && $authStore.token) {
       token = $authStore.token;
-      await loadExpenses();
+      loadExpenses();
+    } else if (browser && !$authStore.isAuthenticated) {
+      // Reset data when user is not authenticated
+      allExpenses = [];
+      loading = false;
     }
   });
 
   async function loadExpenses() {
     try {
       loading = true;
-      expenses = await ExpenseService.getExpenses(token);
+      allExpenses = await ExpenseService.getExpenses(token);
     } catch (error) {
       console.error("Failed to load expenses:", error);
       toast.error("Fehler beim Laden der Ausgaben");
@@ -60,11 +78,60 @@
     }
   }
 
+  // Filter expenses for selected month/year and apply category/amount filters
+  let expenses = $derived(
+    allExpenses
+      .filter((exp) => {
+        const expDate = new Date(exp.date);
+        const monthMatches = expDate.getMonth() + 1 === selectedMonth;
+        const yearMatches = expDate.getFullYear() === selectedYear;
+        const categoryMatches =
+          selectedCategory === "all" || exp.category === selectedCategory;
+
+        let amountMatches = true;
+        if (amountSearch.trim()) {
+          const searchAmount = parseFloat(amountSearch);
+          if (!isNaN(searchAmount)) {
+            const expAmount = parseFloat(exp.amount.toString());
+            // Exact match or within 0.01 tolerance for floating point comparison
+            amountMatches = Math.abs(expAmount - searchAmount) < 0.01;
+          }
+        }
+
+        return monthMatches && yearMatches && categoryMatches && amountMatches;
+      })
+      .map((e) => ({
+        id: parseInt(e.id.replace(/-/g, "").slice(0, 8), 16),
+        date: new Date(e.date).toLocaleDateString("de-DE"),
+        category: e.category,
+        amount: parseFloat(e.amount.toString()),
+        description: e.description,
+      }))
+  );
+
+  // Filter handlers
+  function handleMonthChange(month: number) {
+    selectedMonth = month;
+  }
+
+  function handleYearChange(year: number) {
+    selectedYear = year;
+  }
+
+  function handleCategoryChange(category: string) {
+    selectedCategory = category;
+  }
+
+  function handleAmountSearchChange(amount: string) {
+    amountSearch = amount;
+  }
+
   function handleAddExpense() {
+    const now = new Date();
     formData = {
       description: "",
       amount: 0,
-      date: new Date().toISOString().slice(0, 19).replace("T", " "),
+      date: now.toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM for datetime-local
       category: "Lebensmittel",
     };
     showAddDialog = true;
@@ -72,10 +139,12 @@
 
   async function submitAddExpense() {
     try {
+      // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
+      const dateForBackend = formData.date.replace("T", " ") + ":00";
       const request: CreateExpenseRequest = {
         description: formData.description,
         amount: formData.amount,
-        date: formData.date,
+        date: dateForBackend,
         category: formData.category,
       };
 
@@ -89,14 +158,16 @@
     }
   }
 
-  function handleEditExpense(id: string) {
-    const expense = expenses.find((e) => e.id === id);
+  function handleEditExpense(id: number) {
+    const expense = allExpenses[expenses.findIndex((e) => e.id === id)];
     if (expense) {
       editingExpense = expense;
+      // Convert backend format (YYYY-MM-DD HH:MM:SS) to datetime-local format (YYYY-MM-DDTHH:MM)
+      const dateForInput = expense.date.slice(0, 16).replace(" ", "T");
       formData = {
         description: expense.description,
         amount: parseFloat(expense.amount.toString()),
-        date: expense.date,
+        date: dateForInput,
         category: expense.category,
       };
       showEditDialog = true;
@@ -107,12 +178,14 @@
     if (!editingExpense) return;
 
     try {
+      // Convert datetime-local format to backend format (YYYY-MM-DD HH:MM:SS)
+      const dateForBackend = formData.date.replace("T", " ") + ":00";
       await ExpenseService.updateExpense(
         editingExpense.id,
         {
           description: formData.description,
           amount: formData.amount,
-          date: formData.date,
+          date: dateForBackend,
           category: formData.category,
         },
         token
@@ -126,11 +199,14 @@
     }
   }
 
-  async function handleDeleteExpense(id: string) {
+  async function handleDeleteExpense(id: number) {
+    const expense = allExpenses[expenses.findIndex((e) => e.id === id)];
+    if (!expense) return;
+
     if (!confirm("Möchten Sie diese Ausgabe wirklich löschen?")) return;
 
     try {
-      await ExpenseService.deleteExpense(id, token);
+      await ExpenseService.deleteExpense(expense.id, token);
       await loadExpenses();
       toast.success("Ausgabe erfolgreich gelöscht");
     } catch (error) {
@@ -142,17 +218,6 @@
   function handleUploadFile(type: "image" | "pdf") {
     toast.info(`${type === "image" ? "Bild" : "PDF"}-Upload kommt bald!`);
   }
-
-  // Transform expenses for the component using $derived
-  let transformedExpenses = $derived(
-    expenses.map((e) => ({
-      id: parseInt(e.id.replace(/-/g, "").slice(0, 8), 16), // Simple ID transformation
-      date: new Date(e.date).toLocaleDateString("de-DE"),
-      category: e.category,
-      amount: parseFloat(e.amount.toString()),
-      description: e.description,
-    }))
-  );
 </script>
 
 <svelte:head>
@@ -165,20 +230,20 @@
       <p>Lade Ausgaben...</p>
     </div>
   {:else}
-    <Expenses
-      expenses={transformedExpenses}
+    <ExpensesWithFilters
+      {expenses}
+      {selectedMonth}
+      {selectedYear}
+      {selectedCategory}
+      {amountSearch}
       onAddExpense={handleAddExpense}
       onUploadFile={handleUploadFile}
-      onEditExpense={(id) => {
-        const expense =
-          expenses[transformedExpenses.findIndex((e) => e.id === id)];
-        if (expense) handleEditExpense(expense.id);
-      }}
-      onDeleteExpense={(id) => {
-        const expense =
-          expenses[transformedExpenses.findIndex((e) => e.id === id)];
-        if (expense) handleDeleteExpense(expense.id);
-      }}
+      onEditExpense={handleEditExpense}
+      onDeleteExpense={handleDeleteExpense}
+      onMonthChange={handleMonthChange}
+      onYearChange={handleYearChange}
+      onCategoryChange={handleCategoryChange}
+      onAmountSearchChange={handleAmountSearchChange}
     />
   {/if}
 </div>
@@ -214,21 +279,17 @@
       </div>
       <div class="grid gap-2">
         <Label for="category">Kategorie</Label>
-        <Select.Root>
-          <Select.Trigger>
-            <Select.Value placeholder="Kategorie wählen" />
-          </Select.Trigger>
-          <Select.Content>
-            {#each categories as category}
-              <Select.Item
-                value={category}
-                onclick={() => (formData.category = category)}
-              >
-                {category}
-              </Select.Item>
-            {/each}
-          </Select.Content>
-        </Select.Root>
+        <select
+          id="category"
+          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          bind:value={formData.category}
+        >
+          {#each categories as category}
+            <option value={category}>
+              {category}
+            </option>
+          {/each}
+        </select>
       </div>
     </div>
     <Dialog.Footer>
@@ -270,21 +331,17 @@
       </div>
       <div class="grid gap-2">
         <Label for="edit-category">Kategorie</Label>
-        <Select.Root>
-          <Select.Trigger>
-            <Select.Value placeholder={formData.category} />
-          </Select.Trigger>
-          <Select.Content>
-            {#each categories as category}
-              <Select.Item
-                value={category}
-                onclick={() => (formData.category = category)}
-              >
-                {category}
-              </Select.Item>
-            {/each}
-          </Select.Content>
-        </Select.Root>
+        <select
+          id="edit-category"
+          class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          bind:value={formData.category}
+        >
+          {#each categories as category}
+            <option value={category}>
+              {category}
+            </option>
+          {/each}
+        </select>
       </div>
     </div>
     <Dialog.Footer>
