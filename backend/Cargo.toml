@@ -29,3 +29,6 @@ async-trait = "0.1"
 utoipa = { version = "4.2", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
 cookie = { version = "0.18.1", features = ["percent-encode"] }
+hyper = "1.5"
+hyper-util = { version = "0.1", features = ["client", "client-legacy", "http1", "http2", "tokio"] }
+http = "1.1"

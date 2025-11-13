@@ -1,15 +1,16 @@
-use super::{root, AppState};
+use super::AppState;
 use crate::utils::router_ext::RouterExt;
 use axum::body::Body;
 use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use axum::http::Method;
 use axum::http::{HeaderValue, Request, Response};
-use axum::{routing::get, Router};
+use axum::Router;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info_span, Span};
 
 pub mod expenses;
+pub mod frontend;
 pub mod subscriptions;
 pub mod users;
 
@@ -39,7 +40,7 @@ pub fn create_router() -> Router<AppState> {
         .merge(users::users_routes());
 
     Router::new()
-        .logged_route("/", get(root))
+        // API routes have priority
         .logged_nest("/api", api_router)
         .layer(
             TraceLayer::new_for_http()
@@ -64,4 +65,6 @@ pub fn create_router() -> Router<AppState> {
                 ),
         )
         .layer(cors)
+        // Frontend proxy as fallback - catches all routes not handled above
+        .fallback_service(frontend::frontend_router())
 }

@@ -147,9 +147,17 @@ jobs:
         run: |
           echo "## 🚀 Docker Image Published (Multi-Arch)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Unified FinanceVault Image (Backend + Frontend + SQLite)" >> $GITHUB_STEP_SUMMARY
+          echo "### FinanceVault - Single Binary Architecture" >> $GITHUB_STEP_SUMMARY
+          echo "**Architecture**: Backend with embedded frontend proxy" >> $GITHUB_STEP_SUMMARY
           echo "**Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### How it works:" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend runs on port **8000** (Rust/Axum)" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend runs on port **3000** (SvelteKit/Node)" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend proxies all non-API requests to frontend" >> $GITHUB_STEP_SUMMARY
+          echo "- Single entry point: **http://localhost:8000**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Available Tags" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
@@ -161,5 +169,15 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Run Command" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "docker run -d -p 8000:8000 -p 3000:3000 -v financevault_data:/data -e JWT_SECRET=\$(openssl rand -hex 32) ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "docker run -d \\" >> $GITHUB_STEP_SUMMARY
+          echo "  -p 8000:8000 \\" >> $GITHUB_STEP_SUMMARY
+          echo "  -p 3000:3000 \\" >> $GITHUB_STEP_SUMMARY
+          echo "  -v financevault_data:/data \\" >> $GITHUB_STEP_SUMMARY
+          echo "  -e JWT_SECRET=\$(openssl rand -hex 32) \\" >> $GITHUB_STEP_SUMMARY
+          echo "  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Access the Application" >> $GITHUB_STEP_SUMMARY
+          echo "- **Web Interface**: http://localhost:8000" >> $GITHUB_STEP_SUMMARY
+          echo "- **API Docs**: http://localhost:8000/swagger-ui" >> $GITHUB_STEP_SUMMARY
+          echo "- **API Endpoint**: http://localhost:8000/api" >> $GITHUB_STEP_SUMMARY
