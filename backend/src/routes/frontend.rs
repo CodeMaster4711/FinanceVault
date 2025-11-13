@@ -38,8 +38,9 @@ impl FrontendState {
 pub fn frontend_router() -> Router {
     let state = FrontendState::new();
 
-    // Only proxy specific frontend routes, not API routes
+    // Proxy root and all other routes to frontend
     Router::new()
+        .route("/", get(handler))
         .route("/*path", get(handler))
         .with_state(state)
 }

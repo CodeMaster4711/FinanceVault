@@ -39,22 +39,11 @@ RUN apt-get update && apt-get install -y \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependencies manifests
-COPY backend/Cargo.toml backend/Cargo.lock ./
-COPY backend/migration/Cargo.toml ./migration/Cargo.toml
-COPY backend/entity/Cargo.toml ./entity/Cargo.toml
-
-# Create a dummy lib.rs to cache dependencies
-RUN mkdir -p src && echo "fn main() {}" > src/main.rs
-RUN mkdir -p migration/src && touch migration/src/lib.rs
-RUN mkdir -p entity/src && touch entity/src/lib.rs
-RUN cargo build --release
-
-# Copy all backend source
+# Copy all backend source (simplified - no dependency caching for now)
 COPY backend/ ./
 
-# Rebuild with real source
-RUN touch src/main.rs && cargo build --release --verbose
+# Build the backend
+RUN cargo build --release --verbose
 
 ###################
 # Final Runtime Stage
