@@ -2,6 +2,13 @@
 
 All notable changes to FinanceVault will be documented in this file.
 
+## [0.1.2](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.1...v0.1.2) (2025-11-13)
+
+
+### Bug Fixes
+
+* reamde ([95ace83](https://github.com/CodeMaster4711/FinanceVault/commit/95ace83eac07d3dc363fe12aae5ff50a5273b462))
+
 ## [0.1.1](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.0...v0.1.1) (2025-11-13)
 
 
