@@ -64,7 +64,6 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
           platforms: ${{ matrix.platform }}
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ steps.repo.outputs.image_name }},push-by-digest=true,name-canonical=true,push=true
 
   create-manifest:
     needs: [build]
