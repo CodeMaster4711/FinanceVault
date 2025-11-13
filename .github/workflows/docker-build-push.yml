@@ -53,17 +53,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push ${{ matrix.arch }} image
+      - name: Build and export ${{ matrix.arch }} image to registry
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ steps.repo.outputs.image_name }}:build-${{ matrix.arch }}-${{ github.sha }}
+          tags: ${{ env.REGISTRY }}/${{ steps.repo.outputs.image_name }}:temp-${{ matrix.arch }}-${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
           platforms: ${{ matrix.platform }}
+          provenance: false
 
   create-manifest:
     needs: [build]
@@ -98,14 +99,6 @@ jobs:
             type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Get digests from build jobs
-        id: digests
-        run: |
-          # Die Digests müssen aus den Matrix-Outputs extrahiert werden
-          # Da Matrix-Outputs nicht direkt verfügbar sind, nutzen wir die Tags
-          echo "Waiting for digest propagation..."
-          sleep 10
-
       - name: Create and push multi-arch manifest
         run: |
           TAGS="${{ steps.meta.outputs.tags }}"
@@ -117,11 +110,53 @@ jobs:
           for tag in $TAGS; do
             echo "Creating manifest for: $tag"
             docker buildx imagetools create -t $tag \
-              ${{ env.REGISTRY }}/${IMAGE_NAME}:build-amd64-${{ github.sha }} \
-              ${{ env.REGISTRY }}/${IMAGE_NAME}:build-arm64-${{ github.sha }}
+              ${{ env.REGISTRY }}/${IMAGE_NAME}:temp-amd64-${{ github.sha }} \
+              ${{ env.REGISTRY }}/${IMAGE_NAME}:temp-arm64-${{ github.sha }}
           done
 
           echo "✅ Multi-arch manifests created successfully"
+
+      - name: Cleanup temporary tags
+        if: always()
+        continue-on-error: true
+        run: |
+          IMAGE_NAME="${{ steps.repo.outputs.image_name }}"
+
+          echo "🧹 Cleaning up temporary build tags..."
+
+          # Funktion zum Löschen eines Tags über GitHub API
+          delete_tag() {
+            local tag=$1
+            echo "Attempting to delete tag: $tag"
+            
+            # Versuche das Package über die GitHub Container Registry API zu löschen
+            # Hinweis: Dies funktioniert nur, wenn der Tag noch nicht in einem Manifest verwendet wird
+            TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            
+            # Hole alle Versionen des Packages
+            VERSIONS=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/user/packages/container/${IMAGE_NAME}/versions" | \
+              jq -r '.[] | select(.metadata.container.tags[]? == "'${tag}'") | .id' 2>/dev/null || echo "")
+            
+            if [ -n "$VERSIONS" ]; then
+              for VERSION_ID in $VERSIONS; do
+                echo "Deleting version ID: $VERSION_ID"
+                curl -X DELETE \
+                  -H "Authorization: Bearer ${TOKEN}" \
+                  -H "Accept: application/vnd.github+json" \
+                  "https://api.github.com/user/packages/container/${IMAGE_NAME}/versions/${VERSION_ID}" 2>/dev/null || true
+              done
+            else
+              echo "No version found for tag: $tag (may already be cleaned up)"
+            fi
+          }
+
+          # Lösche temporäre Tags
+          delete_tag "temp-amd64-${{ github.sha }}"
+          delete_tag "temp-arm64-${{ github.sha }}"
+
+          echo "✅ Cleanup completed"
 
       - name: Generate deployment summary
         run: |
