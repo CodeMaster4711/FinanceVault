@@ -2,6 +2,13 @@
 
 All notable changes to FinanceVault will be documented in this file.
 
+## [0.1.5](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.4...v0.1.5) (2025-11-13)
+
+
+### Bug Fixes
+
+* pipeline delete temp registry ([be8882f](https://github.com/CodeMaster4711/FinanceVault/commit/be8882f12a17257c55c8f8c408269fe77140d299))
+
 ## [0.1.4](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.3...v0.1.4) (2025-11-13)
 
 
