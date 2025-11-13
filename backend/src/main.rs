@@ -1,6 +1,4 @@
-use axum::{extract::State, response::Json};
 use sea_orm::DbConn;
-use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tokio;
 use utoipa::OpenApi;
@@ -111,17 +109,4 @@ async fn main() {
     tracing::info!("listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-// basic handler that responds with a static string
-pub async fn root(State(state): State<AppState>) -> Json<Value> {
-    // You can now use `state.db_conn` to interact with the database
-    // For this example, we'll just confirm the connection is there.
-    let db_status = if state.db_conn.ping().await.is_ok() {
-        "Database connection is healthy"
-    } else {
-        "Database connection is not healthy"
-    };
-
-    Json(json!({ "message": "Hello from FinanceVault!", "database_status": db_status }))
 }
