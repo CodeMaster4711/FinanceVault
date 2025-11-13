@@ -2,6 +2,13 @@
 
 All notable changes to FinanceVault will be documented in this file.
 
+## [0.1.3](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.2...v0.1.3) (2025-11-13)
+
+
+### Bug Fixes
+
+* pipeline docker build ([1380fc4](https://github.com/CodeMaster4711/FinanceVault/commit/1380fc419c8729fd1e84a46eac3135adb5ccc471))
+
 ## [0.1.2](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.1...v0.1.2) (2025-11-13)
 
 
