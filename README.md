@@ -37,6 +37,8 @@ docker run -d \
 
 
 
+
+
 ```bash
 # Download and run the start script
 curl -O https://raw.githubusercontent.com/CodeMaster4711/FinanceVault/main/start-docker.sh
