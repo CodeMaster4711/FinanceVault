@@ -22,6 +22,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Checkout repository
@@ -37,35 +39,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}},suffix=-amd64
-            type=semver,pattern={{major}}.{{minor}},suffix=-amd64
-            type=semver,pattern={{major}},suffix=-amd64
-            type=raw,value=${{ inputs.version }}-amd64,enable=${{ inputs.version != '' }}
-            type=raw,value=latest-amd64,enable={{is_default_branch}}
-
       - name: Build and push AMD64 image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-amd64-${{ github.sha }}
           cache-from: type=gha,scope=amd64
           cache-to: type=gha,mode=max,scope=amd64
           platforms: linux/amd64
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
 
   build-arm64:
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Checkout repository
@@ -81,31 +74,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}},suffix=-arm64
-            type=semver,pattern={{major}}.{{minor}},suffix=-arm64
-            type=semver,pattern={{major}},suffix=-arm64
-            type=raw,value=${{ inputs.version }}-arm64,enable=${{ inputs.version != '' }}
-            type=raw,value=latest-arm64,enable={{is_default_branch}}
-
       - name: Build and push ARM64 image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-arm64-${{ github.sha }}
           platforms: linux/arm64
           cache-from: type=gha,scope=arm64
           cache-to: type=gha,mode=max,scope=arm64
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
 
   create-manifest:
     needs: [build-amd64, build-arm64]
@@ -115,6 +95,9 @@ jobs:
       packages: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -129,19 +112,33 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
             type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Create and push multi-arch manifest
         run: |
           TAGS="${{ steps.meta.outputs.tags }}"
+          AMD64_DIGEST="${{ needs.build-amd64.outputs.digest }}"
+          ARM64_DIGEST="${{ needs.build-arm64.outputs.digest }}"
+
+          echo "Creating multi-arch manifests for tags:"
+          echo "$TAGS"
+
           for tag in $TAGS; do
+            echo "Creating manifest for: $tag"
             docker buildx imagetools create -t $tag \
-              ${tag}-amd64 \
-              ${tag}-arm64
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${AMD64_DIGEST} \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${ARM64_DIGEST}
           done
+
+          echo "✅ Multi-arch manifests created successfully"
+
+          # Cleanup temporary build tags
+          echo "Cleaning up temporary build tags..."
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-temp \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-amd64-${{ github.sha }} 2>/dev/null || true
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-temp \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:build-arm64-${{ github.sha }} 2>/dev/null || true
 
       - name: Generate deployment summary
         run: |
@@ -153,7 +150,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### How it works:" >> $GITHUB_STEP_SUMMARY
           echo "- Backend runs on port **8000** (Rust/Axum)" >> $GITHUB_STEP_SUMMARY
-          echo "- Frontend runs on port **3000** (SvelteKit/Node)" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend runs on port **3000** (SvelteKit/Node, internal only)" >> $GITHUB_STEP_SUMMARY
           echo "- Backend proxies all non-API requests to frontend" >> $GITHUB_STEP_SUMMARY
           echo "- Single entry point: **http://localhost:8000**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -165,13 +162,13 @@ jobs:
           echo "### Pull Command" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "# Docker wählt automatisch die richtige Architektur (amd64/arm64)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Run Command" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "docker run -d \\" >> $GITHUB_STEP_SUMMARY
           echo "  -p 8000:8000 \\" >> $GITHUB_STEP_SUMMARY
-          echo "  -p 3000:3000 \\" >> $GITHUB_STEP_SUMMARY
           echo "  -v financevault_data:/data \\" >> $GITHUB_STEP_SUMMARY
           echo "  -e JWT_SECRET=\$(openssl rand -hex 32) \\" >> $GITHUB_STEP_SUMMARY
           echo "  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
