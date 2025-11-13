@@ -2,6 +2,14 @@
 
 All notable changes to FinanceVault will be documented in this file.
 
+## [0.1.1](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.0...v0.1.1) (2025-11-13)
+
+
+### Bug Fixes
+
+* docker internal frontend routing ([2dbc93c](https://github.com/CodeMaster4711/FinanceVault/commit/2dbc93c2d09b717ae9badcc6aebe5f63c87cc828))
+* single binary architecture ([0bdbcb5](https://github.com/CodeMaster4711/FinanceVault/commit/0bdbcb51a5263f727c26d3ed9c08833889451986))
+
 # [0.1.0](https://github.com/CodeMaster4711/FinanceVault/compare/v0.0.3...v0.1.0) (2025-11-07)
 
 
