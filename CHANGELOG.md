@@ -2,6 +2,13 @@
 
 All notable changes to FinanceVault will be documented in this file.
 
+## [0.1.4](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.3...v0.1.4) (2025-11-13)
+
+
+### Bug Fixes
+
+* pipeline temp regestry push rm ([9e4e107](https://github.com/CodeMaster4711/FinanceVault/commit/9e4e10787b9dda04dbb60cace63141c8b3961ba5))
+
 ## [0.1.3](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.2...v0.1.3) (2025-11-13)
 
 
