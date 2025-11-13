@@ -116,47 +116,25 @@ jobs:
 
           echo "✅ Multi-arch manifests created successfully"
 
-      - name: Cleanup temporary tags
+      - name: Extract package name
+        id: package
+        run: |
+          # Extrahiere nur den Package-Namen ohne Owner
+          PACKAGE_NAME=$(echo "${{ steps.repo.outputs.image_name }}" | cut -d'/' -f2)
+          echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "Package name: ${PACKAGE_NAME}"
+
+      - name: Delete temporary image tags from registry
+        uses: actions/delete-package-versions@v5
         if: always()
         continue-on-error: true
-        run: |
-          IMAGE_NAME="${{ steps.repo.outputs.image_name }}"
-
-          echo "🧹 Cleaning up temporary build tags..."
-
-          # Funktion zum Löschen eines Tags über GitHub API
-          delete_tag() {
-            local tag=$1
-            echo "Attempting to delete tag: $tag"
-            
-            # Versuche das Package über die GitHub Container Registry API zu löschen
-            # Hinweis: Dies funktioniert nur, wenn der Tag noch nicht in einem Manifest verwendet wird
-            TOKEN="${{ secrets.GITHUB_TOKEN }}"
-            
-            # Hole alle Versionen des Packages
-            VERSIONS=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/user/packages/container/${IMAGE_NAME}/versions" | \
-              jq -r '.[] | select(.metadata.container.tags[]? == "'${tag}'") | .id' 2>/dev/null || echo "")
-            
-            if [ -n "$VERSIONS" ]; then
-              for VERSION_ID in $VERSIONS; do
-                echo "Deleting version ID: $VERSION_ID"
-                curl -X DELETE \
-                  -H "Authorization: Bearer ${TOKEN}" \
-                  -H "Accept: application/vnd.github+json" \
-                  "https://api.github.com/user/packages/container/${IMAGE_NAME}/versions/${VERSION_ID}" 2>/dev/null || true
-              done
-            else
-              echo "No version found for tag: $tag (may already be cleaned up)"
-            fi
-          }
-
-          # Lösche temporäre Tags
-          delete_tag "temp-amd64-${{ github.sha }}"
-          delete_tag "temp-arm64-${{ github.sha }}"
-
-          echo "✅ Cleanup completed"
+        with:
+          package-name: ${{ steps.package.outputs.package_name }}
+          package-type: "container"
+          min-versions-to-keep: 0
+          delete-only-untagged-versions: "false"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ignore-versions: '^(latest|v?\d+\.\d+\.\d+.*)$'
 
       - name: Generate deployment summary
         run: |
