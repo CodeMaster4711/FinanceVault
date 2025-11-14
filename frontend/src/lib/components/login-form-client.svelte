@@ -111,24 +111,6 @@
       isLoading = false;
     }
   }
-
-  const features = [
-    {
-      icon: "🔒",
-      title: "Sicherheit",
-      description: "Bank-grade Verschlüsselung",
-    },
-    {
-      icon: "📊",
-      title: "Analytics",
-      description: "Detaillierte Finanzanalysen",
-    },
-    {
-      icon: "⚡",
-      title: "Schnell",
-      description: "Blitzschnelle Performance",
-    },
-  ];
 </script>
 
 <div class={cn("min-h-screen flex", className)} {...restProps}>
@@ -214,9 +196,7 @@
   <!-- Right Side - Animated Background with Features -->
   <div class="flex-1 relative hidden lg:flex flex-col overflow-hidden">
     <!-- Animated Background Container -->
-    <div
-      class="absolute inset-0 rounded-l-3xl overflow-hidden bg-gradient-to-br from-[#000814] via-[#001d3d] to-[#003566]"
-    >
+    <div class="absolute inset-0 rounded-l-3xl overflow-hidden animated-bg">
       <!-- Gradient Orbs -->
       <div class="gradient-orb orb1"></div>
       <div class="gradient-orb orb2"></div>
@@ -229,28 +209,16 @@
       <div class="blur-overlay"></div>
     </div>
 
-    <!-- Feature Cards -->
-    <div class="absolute top-8 left-8 right-8 z-20">
-      <div class="grid grid-cols-3 gap-4">
-        {#each features as feature}
-          <Card.Root
-            class="backdrop-blur-md bg-white/10 border-white/20 text-white"
-          >
-            <Card.Content class="p-4">
-              <div class="text-2xl mb-2">{feature.icon}</div>
-              <h3 class="font-semibold text-sm mb-1">{feature.title}</h3>
-              <p class="text-xs text-white/80">{feature.description}</p>
-            </Card.Content>
-          </Card.Root>
-        {/each}
-      </div>
-    </div>
-
     <!-- Logo Overlay -->
     <div class="absolute inset-0 flex items-center justify-center z-10">
       <div class="text-center text-white">
+        <img
+          src="/logos/FinanceVault.png"
+          alt="FinanceVault Logo"
+          class="mx-auto mb-4 w-200 h-200 md:w-200 h-200 lg:w-[240px] h-[240px]"
+        />
+
         <h2 class="text-4xl font-bold mb-4 text-shadow-glow">FinanceVault</h2>
-        <p class="text-xl opacity-90">Ihre sichere Finanzlösung</p>
       </div>
     </div>
   </div>
@@ -266,13 +234,22 @@
     animation: float 20s infinite ease-in-out;
   }
 
+  .animated-bg {
+    background: linear-gradient(
+      135deg,
+      var(--color-primary),
+      var(--color-chart-2),
+      var(--color-chart-1)
+    );
+  }
+
   .orb1 {
     width: 600px;
     height: 600px;
     background: radial-gradient(
       circle,
-      rgba(0, 119, 182, 0.8) 0%,
-      rgba(0, 53, 102, 0.3) 70%
+      var(--color-chart-1) 0%,
+      var(--color-chart-2) 70%
     );
     top: -200px;
     left: -200px;
@@ -284,8 +261,8 @@
     height: 500px;
     background: radial-gradient(
       circle,
-      rgba(0, 180, 216, 0.6) 0%,
-      rgba(0, 119, 182, 0.2) 70%
+      var(--color-chart-2) 0%,
+      var(--color-primary) 70%
     );
     bottom: -150px;
     right: -150px;
@@ -297,8 +274,8 @@
     height: 400px;
     background: radial-gradient(
       circle,
-      rgba(72, 202, 228, 0.5) 0%,
-      rgba(0, 119, 182, 0.2) 70%
+      var(--color-chart-3) 0%,
+      var(--color-chart-2) 70%
     );
     top: 50%;
     left: 50%;
@@ -316,7 +293,7 @@
     position: absolute;
     width: 3px;
     height: 3px;
-    background: rgba(72, 202, 228, 0.8);
+    background: var(--color-chart-3);
     border-radius: 50%;
     animation: particleFloat 15s infinite ease-in-out;
   }
@@ -327,7 +304,7 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(72, 202, 228, 0.6),
+      var(--color-chart-3),
       transparent
     );
     animation: lineMove 8s infinite ease-in-out;
@@ -345,7 +322,7 @@
   }
 
   .text-shadow-glow {
-    text-shadow: 0 0 30px rgba(72, 202, 228, 0.5);
+    text-shadow: 0 0 30px var(--color-chart-3);
   }
 
   @keyframes float {
