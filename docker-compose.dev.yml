@@ -22,7 +22,7 @@ services:
       - .env
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
     volumes:
@@ -34,7 +34,8 @@ services:
       - DATABASE_URL=sqlite:/data/finance.db
       - CARGO_HOME=/usr/local/cargo
       - JWT_SECRET=${JWT_SECRET}
-    command: sh -c "cargo install cargo-watch && JWT_SECRET=${JWT_SECRET} cargo watch -x run"
+      - RUST_LOG=debug
+    command: cargo watch -x run
 
 volumes:
   cargo_registry:
