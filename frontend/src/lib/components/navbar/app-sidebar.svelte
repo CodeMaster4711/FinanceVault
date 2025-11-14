@@ -1,23 +1,12 @@
 <script lang="ts" module>
-  import BookOpenIcon from "@lucide/svelte/icons/book-open";
-  import CalendarIcon from "@lucide/svelte/icons/calendar";
-  import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
-  import CarIcon from "@lucide/svelte/icons/car";
-  import MapPinIcon from "@lucide/svelte/icons/map-pin";
-  import Wrench from "@lucide/svelte/icons/wrench";
-  import UsersIcon from "@lucide/svelte/icons/users";
-  import FuelIcon from "@lucide/svelte/icons/fuel";
-  import ClipboardListIcon from "@lucide/svelte/icons/clipboard-list";
-  import ChartPieIcon from "@lucide/svelte/icons/chart-pie";
-  import DollarSignIcon from "@lucide/svelte/icons/dollar-sign";
-  import TrendingUpIcon from "@lucide/svelte/icons/trending-up";
-  import PiggyBankIcon from "@lucide/svelte/icons/piggy-bank";
-  import BarChart3Icon from "@lucide/svelte/icons/bar-chart-3";
-  import SettingsIcon from "@lucide/svelte/icons/settings";
-  import ReceiptIcon from "@lucide/svelte/icons/receipt";
-  import CalendarDaysIcon from "@lucide/svelte/icons/calendar-days";
-  import TargetIcon from "@lucide/svelte/icons/target";
-  import RepeatIcon from "@lucide/svelte/icons/repeat";
+  import {
+    HandCoins,
+    RepeatIcon,
+    ChartPieIcon,
+    LayoutDashboardIcon,
+    PiggyBank,
+    ReceiptText,
+  } from "@lucide/svelte";
 
   // Data for FinanceVault app
   const data = {
@@ -40,19 +29,24 @@
         isActive: true,
       },
       {
-        title: "Monthly Expenses",
+        title: "Expenses",
         url: "/expenses/monthly",
-        icon: CalendarDaysIcon,
-      },
-      {
-        title: "Expense Overview",
-        url: "/expenses/overview",
-        icon: ReceiptIcon,
+        icon: HandCoins,
       },
       {
         title: "Subscriptions",
         url: "/subscriptions",
         icon: RepeatIcon,
+      },
+      {
+        title: "Budgets",
+        url: "/budgets",
+        icon: PiggyBank,
+      },
+      {
+        title: "Invoices",
+        url: "/invoices",
+        icon: ReceiptText,
       },
       {
         title: "Reports",
