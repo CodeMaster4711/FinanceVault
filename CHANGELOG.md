@@ -2,6 +2,13 @@
 
 All notable changes to FinanceVault will be documented in this file.
 
+## [0.1.8](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.7...v0.1.8) (2025-11-23)
+
+
+### Bug Fixes
+
+* cors issue and token redirect error ([c71ecfe](https://github.com/CodeMaster4711/FinanceVault/commit/c71ecfe3b51e96a0f6676531370b32f7ee7d3cde))
+
 ## [0.1.7](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.6...v0.1.7) (2025-11-13)
 
 
