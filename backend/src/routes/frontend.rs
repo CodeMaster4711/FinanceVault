@@ -18,19 +18,17 @@ pub struct FrontendState {
 
 impl FrontendState {
     pub fn new() -> Self {
-        #[cfg(not(debug_assertions))]
-        let frontend_url = "http://localhost:3000".to_string();
+        // Internal URL where the frontend server is running (e.g. localhost:3000)
+        // This is distinct from the public FRONTEND_URL used for CORS
+        let proxy_url = std::env::var("FRONTEND_PROXY_URL")
+            .unwrap_or_else(|_| "http://localhost:3000".to_string());
 
-        #[cfg(debug_assertions)]
-        let frontend_url =
-            std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://frontend:5173".to_string());
-
-        tracing::info!("Frontend proxy configured to: {}", frontend_url);
+        tracing::info!("Frontend proxy target configured to: {}", proxy_url);
 
         Self {
             client: hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
                 .build(HttpConnector::new()),
-            frontend_url,
+            frontend_url: proxy_url,
         }
     }
 }
