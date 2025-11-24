@@ -20,6 +20,17 @@
 				} catch (e) { /* fail silently */ }
 			})();
 		</script>
+		<script>
+			// Polyfill for crypto.randomUUID if not available (e.g., in non-secure contexts)
+			if (!crypto.randomUUID) {
+				crypto.randomUUID = function() {
+					return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+						var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+						return v.toString(16);
+					});
+				};
+			}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
