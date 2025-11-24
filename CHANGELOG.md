@@ -2,6 +2,13 @@
 
 All notable changes to FinanceVault will be documented in this file.
 
+## [0.1.9](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.8...v0.1.9) (2025-11-24)
+
+
+### Bug Fixes
+
+* crypto.randomuuid error ([9a1e69b](https://github.com/CodeMaster4711/FinanceVault/commit/9a1e69b3bdc781c33a6d65ca39454670bb5d8ab8))
+
 ## [0.1.8](https://github.com/CodeMaster4711/FinanceVault/compare/v0.1.7...v0.1.8) (2025-11-23)
 
 
