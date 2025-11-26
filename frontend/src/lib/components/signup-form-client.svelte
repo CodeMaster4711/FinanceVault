@@ -233,17 +233,9 @@
   <!-- Right Side - Animated Background with Features -->
   <div class="flex-1 relative hidden lg:flex flex-col overflow-hidden">
     <!-- Animated Background Container -->
-    <div class="absolute inset-0 rounded-l-3xl overflow-hidden animated-bg">
-      <!-- Gradient Orbs -->
-      <div class="gradient-orb orb1"></div>
-      <div class="gradient-orb orb2"></div>
-      <div class="gradient-orb orb3"></div>
-
-      <!-- Particles Container -->
-      <div class="particles-container" bind:this={particlesContainer}></div>
-
-      <!-- Blur Overlay -->
-      <div class="blur-overlay"></div>
+    <div class="absolute inset-0 rounded-l-3xl overflow-hidden">
+      <!-- Gradient SVG Background as Image -->
+      <img src="/Gradientsv3.svg" alt="" class="gradient-svg" />
     </div>
 
     <!-- Logo Overlay -->
@@ -262,154 +254,17 @@
 </div>
 
 <style>
-  /* Gradient Orbs */
-  .gradient-orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(80px);
-    opacity: 0.6;
-    animation: float 20s infinite ease-in-out;
-  }
-
-  .animated-bg {
-    background: linear-gradient(
-      135deg,
-      var(--color-primary),
-      var(--color-chart-2),
-      var(--color-chart-1)
-    );
-  }
-
-  .orb1 {
-    width: 600px;
-    height: 600px;
-    background: radial-gradient(
-      circle,
-      var(--color-chart-1) 0%,
-      var(--color-chart-2) 70%
-    );
-    top: -200px;
-    left: -200px;
-    animation-delay: 0s;
-  }
-
-  .orb2 {
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(
-      circle,
-      var(--color-chart-2) 0%,
-      var(--color-primary) 70%
-    );
-    bottom: -150px;
-    right: -150px;
-    animation-delay: -7s;
-  }
-
-  .orb3 {
-    width: 400px;
-    height: 400px;
-    background: radial-gradient(
-      circle,
-      var(--color-chart-3) 0%,
-      var(--color-chart-2) 70%
-    );
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    animation-delay: -14s;
-  }
-
-  .particles-container {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-  }
-
-  .particle {
-    position: absolute;
-    width: 3px;
-    height: 3px;
-    background: var(--color-chart-3);
-    border-radius: 50%;
-    animation: particleFloat 15s infinite ease-in-out;
-  }
-
-  .animated-line {
-    position: absolute;
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      var(--color-chart-3),
-      transparent
-    );
-    animation: lineMove 8s infinite ease-in-out;
-  }
-
-  .blur-overlay {
+  .gradient-svg {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    backdrop-filter: blur(100px);
-    -webkit-backdrop-filter: blur(100px);
-    z-index: 1;
+    object-fit: cover;
+    z-index: -1;
   }
 
   .text-shadow-glow {
     text-shadow: 0 0 30px var(--color-chart-3);
-  }
-
-  @keyframes float {
-    0%,
-    100% {
-      transform: translate(0, 0) scale(1);
-    }
-    25% {
-      transform: translate(100px, 100px) scale(1.1);
-    }
-    50% {
-      transform: translate(200px, -50px) scale(0.9);
-    }
-    75% {
-      transform: translate(-50px, 150px) scale(1.05);
-    }
-  }
-
-  @keyframes particleFloat {
-    0%,
-    100% {
-      transform: translate(0, 0);
-      opacity: 0;
-    }
-    10% {
-      opacity: 1;
-    }
-    90% {
-      opacity: 1;
-    }
-    100% {
-      transform: translate(var(--tx), var(--ty));
-      opacity: 0;
-    }
-  }
-
-  @keyframes lineMove {
-    0% {
-      transform: translateX(-100%) translateY(0) rotate(var(--angle));
-      opacity: 0;
-    }
-    10% {
-      opacity: 0.6;
-    }
-    90% {
-      opacity: 0.6;
-    }
-    100% {
-      transform: translateX(200%) translateY(100px) rotate(var(--angle));
-      opacity: 0;
-    }
   }
 </style>
