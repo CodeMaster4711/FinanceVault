@@ -19,7 +19,7 @@
   import type { CalendarDate } from "@internationalized/date";
 
   type Subscription = {
-    id: number;
+    id: string;
     name: string;
     amount: number;
     billingDay: number;
@@ -31,8 +31,8 @@
     selectedDate: CalendarDate;
     totalSubscriptions: number;
     onAddSubscription: () => void;
-    onEditSubscription: (id: number) => void;
-    onDeleteSubscription: (id: number) => void;
+    onEditSubscription: (id: string) => void;
+    onDeleteSubscription: (id: string) => void;
   };
 
   let {

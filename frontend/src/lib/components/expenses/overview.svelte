@@ -13,7 +13,7 @@
     selectedMonth: number;
     selectedYear: number;
     expenses: Array<{
-      id: number;
+      id: string;
       date: string;
       category: string;
       amount: number;

@@ -1,10 +1,11 @@
+mod commands;
 mod crypto;
 mod db;
-mod commands;
 mod error;
 
 use std::sync::Mutex;
 use tauri::Manager;
+
 use commands::auth::VaultState;
 use commands::totp::TotpState;
 
@@ -31,17 +32,25 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::auth::unlock,
-            commands::auth::lock,
+            commands::auth::vault_exists,
             commands::auth::is_locked,
             commands::auth::setup_vault,
-            commands::auth::vault_exists,
+            commands::auth::unlock,
+            commands::auth::lock,
             commands::totp::totp_generate_secret,
             commands::totp::totp_get_qr_base64,
             commands::totp::totp_get_url,
             commands::totp::totp_verify,
             commands::totp::totp_enable,
             commands::totp::totp_is_enabled,
+            commands::expenses::get_expenses,
+            commands::expenses::create_expense,
+            commands::expenses::update_expense,
+            commands::expenses::delete_expense,
+            commands::subscriptions::get_subscriptions,
+            commands::subscriptions::create_subscription,
+            commands::subscriptions::update_subscription,
+            commands::subscriptions::delete_subscription,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -18,7 +18,7 @@
   import BadgeCell from "./badge-cell.svelte";
 
   type Expense = {
-    id: number;
+    id: string;
     date: string;
     category: string;
     amount: number;
@@ -29,8 +29,8 @@
     expenses: Expense[];
     onAddExpense: () => void;
     onUploadFile: (type: "image" | "pdf") => void;
-    onEditExpense: (id: number) => void;
-    onDeleteExpense: (id: number) => void;
+    onEditExpense: (id: string) => void;
+    onDeleteExpense: (id: string) => void;
   };
 
   let {

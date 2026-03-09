@@ -6,7 +6,7 @@
 
   type Props = {
     expenses: Array<{
-      id: number;
+      id: string;
       date: string;
       category: string;
       amount: number;

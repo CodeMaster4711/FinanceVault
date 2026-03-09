@@ -20,7 +20,7 @@
   import BadgeCell from "./badge-cell.svelte";
 
   type Expense = {
-    id: number;
+    id: string;
     date: string;
     category: string;
     amount: number;
@@ -35,8 +35,8 @@
     amountSearch: string;
     onAddExpense: () => void;
     onUploadFile: (type: "image" | "pdf") => void;
-    onEditExpense: (id: number) => void;
-    onDeleteExpense: (id: number) => void;
+    onEditExpense: (id: string) => void;
+    onDeleteExpense: (id: string) => void;
     onMonthChange: (month: number) => void;
     onYearChange: (year: number) => void;
     onCategoryChange: (category: string) => void;

@@ -3,54 +3,15 @@
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
-  import BadgeCheckIcon from "@lucide/svelte/icons/badge-check";
-  import BellIcon from "@lucide/svelte/icons/bell";
   import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
-  import CreditCardIcon from "@lucide/svelte/icons/credit-card";
   import LogOutIcon from "@lucide/svelte/icons/log-out";
-  import SparklesIcon from "@lucide/svelte/icons/sparkles";
-  import UserIcon from "@lucide/svelte/icons/user";
-  import { authStore } from "$lib/stores/auth";
-  import { AuthService } from "$lib/services/auth";
-  import { goto } from "$app/navigation";
-  import { onMount } from "svelte";
+  import LockIcon from "@lucide/svelte/icons/lock";
+  import { vault } from "$lib/stores/vault";
 
   const sidebar = useSidebar();
 
-  // Subscribe to auth store - use $derived for reactivity
-  let authState = $derived($authStore);
-
-  // Get user initials for avatar fallback
-  let userInitials = $derived(
-    authState.user?.username
-      ? authState.user.username.substring(0, 2).toUpperCase()
-      : "U"
-  );
-
-  async function handleLogout() {
-    try {
-      if (authState.token) {
-        await AuthService.logout(authState.token);
-      }
-
-      // Clear auth cookie
-      await fetch("/api/set-auth-cookie", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: null }),
-      });
-
-      // Clear store
-      authStore.logout();
-
-      // Redirect to signin
-      await goto("/signin");
-    } catch (error) {
-      console.error("Logout failed:", error);
-      // Even if API call fails, clear local state and redirect
-      authStore.logout();
-      await goto("/signin");
-    }
+  async function handleLock() {
+    await vault.lock();
   }
 </script>
 
@@ -68,14 +29,12 @@
               <Avatar.Fallback
                 class="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
               >
-                {userInitials}
+                FV
               </Avatar.Fallback>
             </Avatar.Root>
             <div class="grid flex-1 text-left text-sm leading-tight">
-              <span class="truncate font-medium"
-                >{authState.user?.username || "User"}</span
-              >
-              <span class="truncate text-xs">FinanceVault</span>
+              <span class="truncate font-medium">FinanceVault</span>
+              <span class="truncate text-xs text-muted-foreground">Local vault</span>
             </div>
             <ChevronsUpDownIcon class="ml-auto size-4" />
           </Sidebar.MenuButton>
@@ -87,42 +46,9 @@
         align="end"
         sideOffset={4}
       >
-        <DropdownMenu.Label class="p-0 font-normal">
-          <div class="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-            <Avatar.Root class="size-8 rounded-lg">
-              <Avatar.Fallback
-                class="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
-              >
-                {userInitials}
-              </Avatar.Fallback>
-            </Avatar.Root>
-            <div class="grid flex-1 text-left text-sm leading-tight">
-              <span class="truncate font-medium"
-                >{authState.user?.username || "User"}</span
-              >
-              <span class="truncate text-xs">FinanceVault</span>
-            </div>
-          </div>
-        </DropdownMenu.Label>
-        <DropdownMenu.Separator />
-        <DropdownMenu.Group>
-          <DropdownMenu.Item>
-            <BadgeCheckIcon />
-            Account
-          </DropdownMenu.Item>
-          <DropdownMenu.Item>
-            <CreditCardIcon />
-            Billing
-          </DropdownMenu.Item>
-          <DropdownMenu.Item>
-            <BellIcon />
-            Notifications
-          </DropdownMenu.Item>
-        </DropdownMenu.Group>
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item onclick={handleLogout}>
-          <LogOutIcon />
-          Log out
+        <DropdownMenu.Item onclick={handleLock}>
+          <LockIcon class="size-4" />
+          Lock Vault
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
