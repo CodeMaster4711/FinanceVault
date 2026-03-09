@@ -14,6 +14,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -57,12 +58,16 @@ pub fn run() {
             commands::budget::get_budget_summary,
             commands::yahoo::resolve_isin,
             commands::yahoo::fetch_quotes,
-            commands::yahoo::fetch_fund_data,
-            commands::yahoo::fetch_history,
             commands::portfolio::get_positions,
             commands::portfolio::create_position,
             commands::portfolio::update_position,
             commands::portfolio::delete_position,
+            commands::portfolio::import_pdf,
+            commands::savings::get_savings_plans,
+            commands::savings::create_savings_plan,
+            commands::savings::update_savings_plan,
+            commands::savings::delete_savings_plan,
+            commands::dashboard::get_dashboard_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

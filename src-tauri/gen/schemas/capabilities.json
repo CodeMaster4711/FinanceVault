@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default capabilities for FinanceVault","local":true,"windows":["main"],"permissions":["core:default","shell:allow-open","http:default"],"platforms":["linux","macOS","windows"]}}
+{"default":{"identifier":"default","description":"Default capabilities for FinanceVault","local":true,"windows":["main"],"permissions":["core:default","shell:allow-open","http:default","dialog:allow-open"],"platforms":["linux","macOS","windows"]}}

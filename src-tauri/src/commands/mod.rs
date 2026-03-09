@@ -1,7 +1,9 @@
 pub mod auth;
 pub mod budget;
+pub mod dashboard;
 pub mod expenses;
 pub mod portfolio;
+pub mod savings;
 pub mod subscriptions;
 pub mod totp;
 pub mod yahoo;

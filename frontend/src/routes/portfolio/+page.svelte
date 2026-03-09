@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { open } from "@tauri-apps/plugin-dialog";
   import * as Card from "$lib/components/ui/card/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
@@ -10,11 +11,7 @@
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
   import { toast } from "svelte-sonner";
-  import { scaleTime, scaleLinear } from "d3-scale";
-  import { Chart, Area, Spline, Axis, LinearGradient, ChartClipPath } from "layerchart";
-  import { YahooService, type Quote, type FundData, type PricePoint } from "$lib/services/yahoo";
-  import TrendingUpIcon from "@lucide/svelte/icons/trending-up";
-  import TrendingDownIcon from "@lucide/svelte/icons/trending-down";
+  import { YahooService, type Quote } from "$lib/services/yahoo";
   import PlusIcon from "@lucide/svelte/icons/plus";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
   import TrashIcon from "@lucide/svelte/icons/trash-2";
@@ -22,7 +19,7 @@
   import SearchIcon from "@lucide/svelte/icons/search";
   import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
   import LoaderIcon from "@lucide/svelte/icons/loader";
-  import BarChart2Icon from "@lucide/svelte/icons/bar-chart-2";
+  import UploadIcon from "@lucide/svelte/icons/upload";
 
   interface Position {
     id: string;
@@ -37,19 +34,13 @@
     created_at: string;
   }
 
-  interface ChartPoint {
-    date: Date;
-    value: number;
+  interface ParsedPdfPosition {
+    isin: string;
+    name: string;
+    quantity: number;
+    price: number;
+    currency: string;
   }
-
-  const ranges = [
-    { value: "1mo", label: "1M" },
-    { value: "3mo", label: "3M" },
-    { value: "6mo", label: "6M" },
-    { value: "1y",  label: "1J" },
-    { value: "2y",  label: "2J" },
-    { value: "5y",  label: "5J" },
-  ];
 
   let positions: Position[] = $state([]);
   let quotes: Record<string, Quote> = $state({});
@@ -57,15 +48,9 @@
   let showAddDialog = $state(false);
   let showEditDialog = $state(false);
   let editingPosition: Position | null = $state(null);
-  let showFundDialog = $state(false);
-  let fundData: FundData | null = $state(null);
-  let fundDataLoading = $state(false);
-  let fundDataTicker = $state("");
-
-  // Chart state
-  let chartRange = $state("1y");
-  let chartData: ChartPoint[] = $state([]);
-  let chartLoading = $state(false);
+  let showPdfDialog = $state(false);
+  let pdfParsed: ParsedPdfPosition[] = $state([]);
+  let pdfImporting = $state(false);
 
   // Add form
   let isinInput = $state("");
@@ -96,10 +81,7 @@
 
   onMount(async () => {
     await loadPositions();
-    if (positions.length > 0) {
-      await refreshQuotes();
-      await buildChart();
-    }
+    if (positions.length > 0) refreshQuotes();
   });
 
   async function loadPositions() {
@@ -126,53 +108,6 @@
     }
   }
 
-  async function buildChart() {
-    if (positions.length === 0) return;
-    chartLoading = true;
-    try {
-      const histories = await Promise.all(
-        positions.map((p) =>
-          YahooService.fetchHistory(p.ticker, chartRange)
-            .then((pts) => ({ ticker: p.ticker, isin: p.isin, quantity: p.quantity, pts }))
-            .catch(() => ({ ticker: p.ticker, isin: p.isin, quantity: p.quantity, pts: [] as PricePoint[] }))
-        )
-      );
-
-      // Collect all unique timestamps
-      const tsSet = new Set<number>();
-      histories.forEach(({ pts }) => pts.forEach((p) => tsSet.add(p.timestamp)));
-      const timestamps = Array.from(tsSet).sort((a, b) => a - b);
-
-      // Build lookup: ticker → timestamp → close
-      const lookup = new Map<string, Map<number, number>>();
-      histories.forEach(({ ticker, pts }) => {
-        const m = new Map<number, number>();
-        pts.forEach((p) => m.set(p.timestamp, p.close));
-        lookup.set(ticker, m);
-      });
-
-      // For each timestamp: sum quantity * close across all positions
-      const points: ChartPoint[] = [];
-      for (const ts of timestamps) {
-        let value = 0;
-        let allPresent = true;
-        for (const { ticker, quantity } of histories) {
-          const close = lookup.get(ticker)?.get(ts);
-          if (close === undefined) { allPresent = false; break; }
-          value += quantity * close;
-        }
-        if (allPresent) {
-          points.push({ date: new Date(ts * 1000), value });
-        }
-      }
-      chartData = points;
-    } catch {
-      chartData = [];
-    } finally {
-      chartLoading = false;
-    }
-  }
-
   function openAdd() {
     isinInput = "";
     resolved = null;
@@ -187,10 +122,7 @@
 
   async function resolveIsin() {
     const isin = isinInput.trim().toUpperCase();
-    if (isin.length < 12) {
-      resolveError = "Bitte eine gültige ISIN eingeben (12 Zeichen)";
-      return;
-    }
+    if (isin.length < 12) { resolveError = "Bitte eine gültige ISIN eingeben (12 Zeichen)"; return; }
     resolving = true;
     resolveError = "";
     resolved = null;
@@ -207,7 +139,6 @@
   async function addPosition() {
     if (!resolved) { toast.error("Bitte zuerst ISIN auflösen"); return; }
     if (!addQuantity || !addAvgPrice) { toast.error("Anzahl und Kaufpreis sind Pflicht"); return; }
-
     try {
       const pos = await invoke<Position>("create_position", {
         input: {
@@ -232,26 +163,15 @@
 
   function openEdit(pos: Position) {
     editingPosition = pos;
-    editForm = {
-      asset_type: pos.asset_type,
-      quantity: pos.quantity,
-      avg_buy_price: pos.avg_buy_price,
-      currency: pos.currency,
-      country: pos.country,
-    };
+    editForm = { asset_type: pos.asset_type, quantity: pos.quantity, avg_buy_price: pos.avg_buy_price, currency: pos.currency, country: pos.country };
     showEditDialog = true;
   }
 
   async function saveEdit() {
     if (!editingPosition) return;
     try {
-      await invoke("update_position", {
-        id: editingPosition.id,
-        input: editForm,
-      });
-      positions = positions.map((p) =>
-        p.id === editingPosition!.id ? { ...p, ...editForm } : p
-      );
+      await invoke("update_position", { id: editingPosition.id, input: editForm });
+      positions = positions.map((p) => p.id === editingPosition!.id ? { ...p, ...editForm } : p);
       showEditDialog = false;
       refreshQuotes();
       toast.success("Position aktualisiert");
@@ -271,34 +191,49 @@
     }
   }
 
-  async function openFundData(ticker: string) {
-    fundDataTicker = ticker;
-    fundData = null;
-    fundDataLoading = true;
-    showFundDialog = true;
+  async function openPdfImport() {
+    const selected = await open({ filters: [{ name: "PDF", extensions: ["pdf"] }], multiple: false });
+    if (!selected) return;
+    const path = typeof selected === "string" ? selected : selected;
+    pdfImporting = true;
     try {
-      fundData = await YahooService.fetchFundData(ticker);
-    } catch {
-      toast.error(`Keine Fund-Daten für ${ticker} verfügbar`);
-      showFundDialog = false;
+      pdfParsed = await invoke<ParsedPdfPosition[]>("import_pdf", { path });
+      if (pdfParsed.length === 0) {
+        toast.error("Keine Positionen im PDF erkannt");
+        return;
+      }
+      showPdfDialog = true;
+    } catch (e) {
+      toast.error("PDF konnte nicht gelesen werden");
     } finally {
-      fundDataLoading = false;
+      pdfImporting = false;
     }
   }
 
-  const sectorLabels: Record<string, string> = {
-    technology: "Technologie",
-    financial_services: "Finanzen",
-    healthcare: "Gesundheit",
-    consumer_cyclical: "Konsum (zyklisch)",
-    consumer_defensive: "Konsum (defensiv)",
-    industrials: "Industrie",
-    communication_services: "Kommunikation",
-    energy: "Energie",
-    basic_materials: "Rohstoffe",
-    utilities: "Versorger",
-    realestate: "Immobilien",
-  };
+  async function confirmPdfImport() {
+    for (const p of pdfParsed) {
+      if (!p.isin || p.quantity <= 0) continue;
+      try {
+        const [ticker, name] = await YahooService.resolveIsin(p.isin).catch(() => [p.isin, p.name] as [string, string]);
+        await invoke("create_position", {
+          input: {
+            isin: p.isin,
+            ticker,
+            name: name || p.name,
+            asset_type: "stock",
+            quantity: p.quantity,
+            avg_buy_price: p.price,
+            currency: p.currency,
+            country: "",
+          },
+        });
+      } catch { /* skip */ }
+    }
+    showPdfDialog = false;
+    await loadPositions();
+    refreshQuotes();
+    toast.success(`${pdfParsed.length} Position(en) importiert`);
+  }
 
   function fmt(value: number, currency = "EUR") {
     return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(value);
@@ -348,9 +283,17 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-2xl font-semibold tracking-tight">Portfolio</h1>
-      <p class="text-sm text-muted-foreground">Kurse via Yahoo Finance — keine Daten werden hochgeladen</p>
+      <p class="text-sm text-muted-foreground">Kurse via Yahoo Finance — lokal, keine Daten werden weitergegeben</p>
     </div>
     <div class="flex gap-2">
+      <Button variant="outline" size="sm" onclick={openPdfImport} disabled={pdfImporting}>
+        {#if pdfImporting}
+          <LoaderIcon class="size-4 mr-1.5 animate-spin" />
+        {:else}
+          <UploadIcon class="size-4 mr-1.5" />
+        {/if}
+        PDF-Import
+      </Button>
       <Button variant="outline" size="sm" onclick={refreshQuotes} disabled={loadingQuotes}>
         <RefreshCwIcon class="size-4 mr-1.5 {loadingQuotes ? 'animate-spin' : ''}" />
         Aktualisieren
@@ -366,19 +309,25 @@
     <Card.Root>
       <Card.Content class="flex flex-col items-center justify-center h-48 gap-3">
         <p class="text-muted-foreground text-sm">Noch keine Positionen vorhanden.</p>
-        <Button size="sm" onclick={openAdd}>
-          <PlusIcon class="size-4 mr-1.5" />
-          Erste Position hinzufügen
-        </Button>
+        <div class="flex gap-2">
+          <Button variant="outline" size="sm" onclick={openPdfImport}>
+            <UploadIcon class="size-4 mr-1.5" />
+            PDF importieren
+          </Button>
+          <Button size="sm" onclick={openAdd}>
+            <PlusIcon class="size-4 mr-1.5" />
+            Manuell hinzufügen
+          </Button>
+        </div>
       </Card.Content>
     </Card.Root>
   {:else}
     <!-- Summary -->
     <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
       {#each [
-        { label: "Investiert", value: fmt(totalInvested), sub: null },
-        { label: "Aktueller Wert", value: fmt(totalCurrent), sub: null },
-        { label: "Gewinn / Verlust", value: fmt(totalGain), sub: null, colored: true, positive: totalGain >= 0 },
+        { label: "Investiert", value: fmt(totalInvested), colored: false },
+        { label: "Aktueller Wert", value: fmt(totalCurrent), colored: false },
+        { label: "Gewinn / Verlust", value: fmt(totalGain), colored: true, positive: totalGain >= 0 },
         { label: "Performance", value: fmtPct(totalGainPct), sub: `${positions.length} Positionen`, colored: true, positive: totalGainPct >= 0 },
       ] as item}
         <Card.Root>
@@ -387,82 +336,13 @@
           </Card.Header>
           <Card.Content class="px-4 pb-4">
             <p class="text-lg font-semibold {item.colored ? (item.positive ? 'text-green-500' : 'text-destructive') : ''}">{item.value}</p>
-            {#if item.sub}<p class="text-xs text-muted-foreground">{item.sub}</p>{/if}
+            {#if "sub" in item && item.sub}<p class="text-xs text-muted-foreground">{item.sub}</p>{/if}
           </Card.Content>
         </Card.Root>
       {/each}
     </div>
 
-    <!-- Portfolio Chart -->
-    <Card.Root>
-      <Card.Header class="flex flex-row items-center justify-between pb-2">
-        <div>
-          <Card.Title class="text-sm font-medium">Gesamtportfolio</Card.Title>
-          {#if chartData.length > 0}
-            {@const first = chartData[0].value}
-            {@const last = chartData[chartData.length - 1].value}
-            {@const diff = last - first}
-            {@const diffPct = first > 0 ? (diff / first) * 100 : 0}
-            <Card.Description class="{diff >= 0 ? 'text-green-500' : 'text-destructive'} font-medium text-xs mt-0.5">
-              {diff >= 0 ? "+" : ""}{fmt(diff)} ({diff >= 0 ? "+" : ""}{diffPct.toFixed(2)}%)
-            </Card.Description>
-          {/if}
-        </div>
-        <div class="flex gap-1">
-          {#each ranges as r}
-            <Button
-              variant={chartRange === r.value ? "default" : "ghost"}
-              size="sm"
-              class="h-7 px-2 text-xs"
-              onclick={async () => { chartRange = r.value; await buildChart(); }}
-            >{r.label}</Button>
-          {/each}
-        </div>
-      </Card.Header>
-      <Card.Content class="px-4 pb-4">
-        {#if chartLoading}
-          <div class="flex items-center justify-center h-52">
-            <LoaderIcon class="size-5 animate-spin text-muted-foreground" />
-          </div>
-        {:else if chartData.length > 1}
-          {@const isPositive = chartData[chartData.length - 1].value >= chartData[0].value}
-          <div class="h-52">
-            <Chart
-              data={chartData}
-              x="date"
-              xScale={scaleTime()}
-              y="value"
-              yScale={scaleLinear()}
-              yNice
-              padding={{ left: 56, bottom: 24, right: 8, top: 8 }}
-            >
-              {#snippet children()}
-                <defs>
-                  <LinearGradient id="chartGrad" vertical>
-                    {#snippet stopsContent()}
-                      <stop offset="0%" stop-color={isPositive ? "hsl(142 76% 36%)" : "hsl(0 72% 51%)"} stop-opacity="0.3" />
-                      <stop offset="100%" stop-color={isPositive ? "hsl(142 76% 36%)" : "hsl(0 72% 51%)"} stop-opacity="0" />
-                    {/snippet}
-                  </LinearGradient>
-                </defs>
-                <ChartClipPath>
-                  <Area fill="url(#chartGrad)" />
-                  <Spline stroke={isPositive ? "hsl(142 76% 36%)" : "hsl(0 72% 51%)"} strokeWidth={1.5} />
-                </ChartClipPath>
-                <Axis placement="left" format={(v: number) => fmt(v)} ticks={4} />
-                <Axis placement="bottom" format={(d: Date) => d.toLocaleDateString("de-DE", { month: "short", day: "numeric" })} ticks={5} />
-              {/snippet}
-            </Chart>
-          </div>
-        {:else}
-          <div class="flex items-center justify-center h-52 text-sm text-muted-foreground">
-            Keine historischen Daten verfügbar.
-          </div>
-        {/if}
-      </Card.Content>
-    </Card.Root>
-
-    <!-- Positions -->
+    <!-- Positions Table -->
     <Card.Root>
       <Card.Header>
         <Card.Title class="text-sm font-medium">Positionen</Card.Title>
@@ -512,9 +392,6 @@
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex gap-1">
-                      <Button variant="ghost" size="icon" class="size-7" onclick={() => openFundData(pos.ticker)} title="Holdings & Sektoren">
-                        <BarChart2Icon class="size-3.5" />
-                      </Button>
                       <Button variant="ghost" size="icon" class="size-7" onclick={() => openEdit(pos)}>
                         <PencilIcon class="size-3.5" />
                       </Button>
@@ -583,30 +460,16 @@
       <Dialog.Title>Position hinzufügen</Dialog.Title>
       <Dialog.Description>ISIN eingeben — Ticker und Name werden automatisch aufgelöst.</Dialog.Description>
     </Dialog.Header>
-
     <div class="space-y-4 py-2">
-      <!-- ISIN Lookup -->
       <div class="space-y-1.5">
         <Label>ISIN</Label>
         <div class="flex gap-2">
-          <Input
-            bind:value={isinInput}
-            placeholder="z.B. US0378331005"
-            class="font-mono uppercase"
-            maxlength={12}
-            onkeydown={(e) => e.key === "Enter" && resolveIsin()}
-          />
+          <Input bind:value={isinInput} placeholder="z.B. US0378331005" class="font-mono uppercase" maxlength={12} onkeydown={(e) => e.key === "Enter" && resolveIsin()} />
           <Button variant="outline" size="sm" onclick={resolveIsin} disabled={resolving}>
-            {#if resolving}
-              <LoaderIcon class="size-4 animate-spin" />
-            {:else}
-              <SearchIcon class="size-4" />
-            {/if}
+            {#if resolving}<LoaderIcon class="size-4 animate-spin" />{:else}<SearchIcon class="size-4" />{/if}
           </Button>
         </div>
-        {#if resolveError}
-          <p class="text-xs text-destructive">{resolveError}</p>
-        {/if}
+        {#if resolveError}<p class="text-xs text-destructive">{resolveError}</p>{/if}
       </div>
 
       {#if resolved}
@@ -614,45 +477,25 @@
           <CheckCircleIcon class="size-4 text-green-500 shrink-0" />
           <div class="text-sm">
             <span class="font-mono font-medium">{resolved.ticker}</span>
-            {#if resolved.name}
-              <span class="text-muted-foreground"> · {resolved.name}</span>
-            {/if}
+            {#if resolved.name}<span class="text-muted-foreground"> · {resolved.name}</span>{/if}
           </div>
         </div>
-
         <Separator />
-
         <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1.5">
-            <Label>Anzahl</Label>
-            <Input type="number" step="0.0001" min="0" bind:value={addQuantity} placeholder="0" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>Ø Kaufpreis</Label>
-            <Input type="number" step="0.01" min="0" bind:value={addAvgPrice} placeholder="0.00" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>Währung</Label>
-            <Input bind:value={addCurrency} placeholder="EUR" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>Land</Label>
-            <Input bind:value={addCountry} placeholder="z.B. USA" />
-          </div>
+          <div class="space-y-1.5"><Label>Anzahl</Label><Input type="number" step="0.0001" min="0" bind:value={addQuantity} /></div>
+          <div class="space-y-1.5"><Label>Ø Kaufpreis</Label><Input type="number" step="0.01" min="0" bind:value={addAvgPrice} /></div>
+          <div class="space-y-1.5"><Label>Währung</Label><Input bind:value={addCurrency} placeholder="EUR" /></div>
+          <div class="space-y-1.5"><Label>Land</Label><Input bind:value={addCountry} placeholder="z.B. USA" /></div>
         </div>
-
         <div class="space-y-1.5">
           <Label>Asset-Typ</Label>
           <Select.Root type="single" bind:value={addAssetType}>
             <Select.Trigger>{assetTypes.find(t => t.value === addAssetType)?.label}</Select.Trigger>
-            <Select.Content>
-              {#each assetTypes as t}<Select.Item value={t.value}>{t.label}</Select.Item>{/each}
-            </Select.Content>
+            <Select.Content>{#each assetTypes as t}<Select.Item value={t.value}>{t.label}</Select.Item>{/each}</Select.Content>
           </Select.Root>
         </div>
       {/if}
     </div>
-
     <Dialog.Footer>
       <Button variant="outline" onclick={() => (showAddDialog = false)}>Abbrechen</Button>
       <Button onclick={addPosition} disabled={!resolved}>Hinzufügen</Button>
@@ -663,36 +506,20 @@
 <!-- Edit Dialog -->
 <Dialog.Root bind:open={showEditDialog}>
   <Dialog.Content class="max-w-md">
-    <Dialog.Header>
-      <Dialog.Title>Position bearbeiten</Dialog.Title>
-    </Dialog.Header>
+    <Dialog.Header><Dialog.Title>Position bearbeiten</Dialog.Title></Dialog.Header>
     <div class="grid gap-4 py-2">
       <div class="space-y-1.5">
         <Label>Typ</Label>
         <Select.Root type="single" bind:value={editForm.asset_type}>
           <Select.Trigger>{assetTypes.find(t => t.value === editForm.asset_type)?.label}</Select.Trigger>
-          <Select.Content>
-            {#each assetTypes as t}<Select.Item value={t.value}>{t.label}</Select.Item>{/each}
-          </Select.Content>
+          <Select.Content>{#each assetTypes as t}<Select.Item value={t.value}>{t.label}</Select.Item>{/each}</Select.Content>
         </Select.Root>
       </div>
       <div class="grid grid-cols-2 gap-3">
-        <div class="space-y-1.5">
-          <Label>Anzahl</Label>
-          <Input type="number" step="0.0001" bind:value={editForm.quantity} />
-        </div>
-        <div class="space-y-1.5">
-          <Label>Ø Kaufpreis</Label>
-          <Input type="number" step="0.01" bind:value={editForm.avg_buy_price} />
-        </div>
-        <div class="space-y-1.5">
-          <Label>Währung</Label>
-          <Input bind:value={editForm.currency} />
-        </div>
-        <div class="space-y-1.5">
-          <Label>Land</Label>
-          <Input bind:value={editForm.country} />
-        </div>
+        <div class="space-y-1.5"><Label>Anzahl</Label><Input type="number" step="0.0001" bind:value={editForm.quantity} /></div>
+        <div class="space-y-1.5"><Label>Ø Kaufpreis</Label><Input type="number" step="0.01" bind:value={editForm.avg_buy_price} /></div>
+        <div class="space-y-1.5"><Label>Währung</Label><Input bind:value={editForm.currency} /></div>
+        <div class="space-y-1.5"><Label>Land</Label><Input bind:value={editForm.country} /></div>
       </div>
     </div>
     <Dialog.Footer>
@@ -702,70 +529,29 @@
   </Dialog.Content>
 </Dialog.Root>
 
-<!-- Fund Data Dialog -->
-<Dialog.Root bind:open={showFundDialog}>
+<!-- PDF Import Confirmation Dialog -->
+<Dialog.Root bind:open={showPdfDialog}>
   <Dialog.Content class="max-w-lg">
     <Dialog.Header>
-      <Dialog.Title>{fundDataTicker} — Holdings & Sektoren</Dialog.Title>
-      <Dialog.Description>Daten via Yahoo Finance · keine Daten werden hochgeladen</Dialog.Description>
+      <Dialog.Title>PDF-Import bestätigen</Dialog.Title>
+      <Dialog.Description>{pdfParsed.length} Position(en) erkannt — bitte prüfen und bestätigen.</Dialog.Description>
     </Dialog.Header>
-
-    {#if fundDataLoading}
-      <div class="flex items-center justify-center h-32">
-        <LoaderIcon class="size-5 animate-spin text-muted-foreground" />
-      </div>
-    {:else if fundData}
-      <div class="space-y-5 py-2 max-h-[60vh] overflow-y-auto pr-1">
-
-        {#if fundData.holdings.length > 0}
-          <div class="space-y-2">
-            <p class="text-sm font-medium">Top Holdings</p>
-            {#each fundData.holdings as h}
-              {@const pct = h.percent * 100}
-              <div class="space-y-1">
-                <div class="flex justify-between text-sm">
-                  <span class="truncate max-w-[260px]">{h.name || h.symbol}</span>
-                  <span class="tabular-nums text-muted-foreground shrink-0 ml-2">{pct.toFixed(2)}%</span>
-                </div>
-                <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                  <div class="h-full rounded-full bg-primary transition-all" style="width: {Math.min(pct * 3, 100)}%"></div>
-                </div>
-              </div>
-            {/each}
+    <div class="max-h-72 overflow-y-auto space-y-2 py-2">
+      {#each pdfParsed as p}
+        <div class="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+          <div>
+            <span class="font-mono text-xs text-muted-foreground">{p.isin}</span>
+            {#if p.name}<span class="ml-2 font-medium">{p.name}</span>{/if}
           </div>
-        {/if}
-
-        {#if fundData.holdings.length > 0 && fundData.sector_weights.length > 0}
-          <Separator />
-        {/if}
-
-        {#if fundData.sector_weights.length > 0}
-          {@const maxSector = Math.max(...fundData.sector_weights.map(s => s.percent))}
-          <div class="space-y-2">
-            <p class="text-sm font-medium">Sektorgewichtung</p>
-            {#each fundData.sector_weights.sort((a, b) => b.percent - a.percent) as s}
-              {@const pct = s.percent * 100}
-              <div class="space-y-1">
-                <div class="flex justify-between text-sm">
-                  <span>{sectorLabels[s.sector] ?? s.sector}</span>
-                  <span class="tabular-nums text-muted-foreground">{pct.toFixed(2)}%</span>
-                </div>
-                <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                  <div class="h-full rounded-full bg-blue-500 transition-all" style="width: {maxSector > 0 ? (s.percent / maxSector) * 100 : 0}%"></div>
-                </div>
-              </div>
-            {/each}
+          <div class="text-right tabular-nums text-muted-foreground">
+            <span>{p.quantity} × {p.currency} {p.price.toFixed(2)}</span>
           </div>
-        {/if}
-
-        {#if fundData.holdings.length === 0 && fundData.sector_weights.length === 0}
-          <p class="text-sm text-muted-foreground text-center py-4">Keine Daten verfügbar.</p>
-        {/if}
-      </div>
-    {/if}
-
+        </div>
+      {/each}
+    </div>
     <Dialog.Footer>
-      <Button variant="outline" onclick={() => (showFundDialog = false)}>Schließen</Button>
+      <Button variant="outline" onclick={() => (showPdfDialog = false)}>Abbrechen</Button>
+      <Button onclick={confirmPdfImport}>Importieren</Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>

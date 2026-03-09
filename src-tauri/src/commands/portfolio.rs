@@ -7,6 +7,15 @@ use crate::commands::auth::VaultState;
 use crate::db;
 use crate::error::{Result, VaultError};
 
+#[derive(Debug, Serialize)]
+pub struct ParsedPdfPosition {
+    pub isin: String,
+    pub name: String,
+    pub quantity: f64,
+    pub price: f64,
+    pub currency: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Position {
     pub id: String,
@@ -149,4 +158,99 @@ pub fn delete_position(id: String, state: State<'_, VaultState>) -> Result<()> {
     conn.execute("DELETE FROM portfolio_positions WHERE id = ?1", [&id])
         .map_err(VaultError::Database)?;
     Ok(())
+}
+
+/// Parse a broker PDF (Trade Republic, Scalable, etc.) and extract positions.
+/// Returns a list of detected positions — the user confirms before saving.
+#[tauri::command]
+pub fn import_pdf(path: String, state: State<'_, VaultState>) -> Result<Vec<ParsedPdfPosition>> {
+    require_unlocked(&state)?;
+
+    let bytes = std::fs::read(&path)
+        .map_err(|e| VaultError::Crypto(format!("cannot read file: {e}")))?;
+
+    let text = pdf_extract::extract_text_from_mem(&bytes)
+        .map_err(|e| VaultError::Crypto(format!("pdf parse error: {e}")))?;
+
+    Ok(parse_pdf_text(&text))
+}
+
+fn parse_pdf_text(text: &str) -> Vec<ParsedPdfPosition> {
+    let mut positions = Vec::new();
+    let lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+
+    // ISIN pattern: 2 uppercase letters + 10 alphanumeric chars
+    let isin_re = regex_isin();
+
+    let mut i = 0;
+    while i < lines.len() {
+        let line = lines[i];
+
+        if let Some(isin) = extract_isin(line, &isin_re) {
+            // Try to find name, quantity, price in surrounding lines
+            let name = find_name(&lines, i);
+            let (quantity, price, currency) = find_quantity_price(&lines, i);
+
+            if quantity > 0.0 && price > 0.0 {
+                positions.push(ParsedPdfPosition {
+                    isin,
+                    name,
+                    quantity,
+                    price,
+                    currency,
+                });
+            }
+        }
+        i += 1;
+    }
+
+    positions
+}
+
+fn regex_isin() -> regex_lite::Regex {
+    regex_lite::Regex::new(r"\b([A-Z]{2}[A-Z0-9]{10})\b").unwrap()
+}
+
+fn extract_isin(line: &str, re: &regex_lite::Regex) -> Option<String> {
+    re.captures(line).map(|c| c[1].to_string())
+}
+
+fn find_name(lines: &[&str], isin_idx: usize) -> String {
+    // Name is usually on the line before or same line before the ISIN
+    if isin_idx > 0 {
+        let prev = lines[isin_idx - 1];
+        if !prev.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+            return prev.to_string();
+        }
+    }
+    String::new()
+}
+
+fn find_quantity_price(lines: &[&str], isin_idx: usize) -> (f64, f64, String) {
+    let search_range = &lines[isin_idx..std::cmp::min(isin_idx + 10, lines.len())];
+    let number_re = regex_lite::Regex::new(r"(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)").unwrap();
+    let currency_re = regex_lite::Regex::new(r"\b(EUR|USD|GBP|CHF)\b").unwrap();
+
+    let mut numbers: Vec<f64> = Vec::new();
+    let mut currency = "EUR".to_string();
+
+    for line in search_range {
+        if let Some(c) = currency_re.find(line) {
+            currency = c.as_str().to_string();
+        }
+        for cap in number_re.captures_iter(line) {
+            let s = cap[1].replace('.', "").replace(',', ".");
+            if let Ok(n) = s.parse::<f64>() {
+                if n > 0.0 {
+                    numbers.push(n);
+                }
+            }
+        }
+    }
+
+    // Heuristic: first reasonable number = quantity, last reasonable = price
+    let quantity = numbers.iter().find(|&&n| n >= 0.001 && n < 100_000.0).copied().unwrap_or(0.0);
+    let price = numbers.iter().rev().find(|&&n| n >= 0.01 && n < 1_000_000.0).copied().unwrap_or(0.0);
+
+    (quantity, price, currency)
 }

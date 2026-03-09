@@ -1,6 +1,9 @@
 target/
 node_modules/
 *.env
+*.db
+*.db-shm
+*.db-wal
 
 # Devenv
 .devenv*
@@ -11,14 +14,14 @@ devenv.local.nix
 
 *.tsbuildinfo
 
+# Tauri build output
+/src-tauri/target/
+/frontend/build/
+/frontend/.svelte-kit/
+
+# Old backend artifacts
 /postgres/
-
-
-finance.db
-
-/backend/db/
-/backend/target/
+/backend/
 
 claude.md
-
 Roadmap.md

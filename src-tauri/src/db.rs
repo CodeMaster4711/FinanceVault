@@ -56,6 +56,18 @@ pub fn migrate(conn: &Connection) -> SqlResult<()> {
             income     REAL NOT NULL,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS savings_plans (
+            id           TEXT PRIMARY KEY,
+            name         TEXT NOT NULL,
+            isin         TEXT NOT NULL,
+            ticker       TEXT NOT NULL,
+            amount       REAL NOT NULL,
+            currency     TEXT NOT NULL DEFAULT 'EUR',
+            interval     TEXT NOT NULL CHECK(interval IN ('monthly','quarterly','yearly')),
+            next_date    TEXT NOT NULL,
+            created_at   TEXT NOT NULL
+        );
     ")?;
     Ok(())
 }
