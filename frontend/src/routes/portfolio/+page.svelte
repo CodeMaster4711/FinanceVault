@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import * as Card from "$lib/components/ui/card/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
@@ -25,14 +26,13 @@
     isin: string;
     ticker: string;
     name: string;
-    assetType: "stock" | "etf" | "crypto" | "other";
+    asset_type: "stock" | "etf" | "crypto" | "other";
     quantity: number;
-    avgBuyPrice: number;
+    avg_buy_price: number;
     currency: string;
     country: string;
+    created_at: string;
   }
-
-  const STORAGE_KEY = "fv_portfolio";
 
   let positions: Position[] = $state([]);
   let quotes: Record<string, Quote> = $state({});
@@ -50,12 +50,15 @@
   let addAvgPrice = $state(0);
   let addCurrency = $state("EUR");
   let addCountry = $state("");
-  let addAssetType = $state<Position["assetType"]>("stock");
+  let addAssetType = $state<Position["asset_type"]>("stock");
 
   // Edit form
   let editForm = $state({
-    isin: "", ticker: "", name: "", assetType: "stock" as Position["assetType"],
-    quantity: 0, avgBuyPrice: 0, currency: "EUR", country: "",
+    asset_type: "stock" as Position["asset_type"],
+    quantity: 0,
+    avg_buy_price: 0,
+    currency: "EUR",
+    country: "",
   });
 
   const assetTypes = [
@@ -65,16 +68,17 @@
     { value: "other", label: "Sonstiges" },
   ];
 
-  onMount(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try { positions = JSON.parse(saved); } catch { positions = []; }
-    }
+  onMount(async () => {
+    await loadPositions();
     if (positions.length > 0) refreshQuotes();
   });
 
-  function persist() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+  async function loadPositions() {
+    try {
+      positions = await invoke<Position[]>("get_positions");
+    } catch {
+      toast.error("Positionen konnten nicht geladen werden");
+    }
   }
 
   async function refreshQuotes() {
@@ -124,48 +128,71 @@
     }
   }
 
-  function addPosition() {
+  async function addPosition() {
     if (!resolved) { toast.error("Bitte zuerst ISIN auflösen"); return; }
     if (!addQuantity || !addAvgPrice) { toast.error("Anzahl und Kaufpreis sind Pflicht"); return; }
 
-    const pos: Position = {
-      id: crypto.randomUUID(),
-      isin: isinInput.trim().toUpperCase(),
-      ticker: resolved.ticker,
-      name: resolved.name,
-      assetType: addAssetType,
-      quantity: addQuantity,
-      avgBuyPrice: addAvgPrice,
-      currency: addCurrency,
-      country: addCountry,
-    };
-    positions = [...positions, pos];
-    persist();
-    showAddDialog = false;
-    refreshQuotes();
-    toast.success(`${pos.name || pos.ticker} hinzugefügt`);
+    try {
+      const pos = await invoke<Position>("create_position", {
+        input: {
+          isin: isinInput.trim().toUpperCase(),
+          ticker: resolved.ticker,
+          name: resolved.name,
+          asset_type: addAssetType,
+          quantity: addQuantity,
+          avg_buy_price: addAvgPrice,
+          currency: addCurrency,
+          country: addCountry,
+        },
+      });
+      positions = [...positions, pos];
+      showAddDialog = false;
+      refreshQuotes();
+      toast.success(`${pos.name || pos.ticker} hinzugefügt`);
+    } catch {
+      toast.error("Position konnte nicht gespeichert werden");
+    }
   }
 
   function openEdit(pos: Position) {
     editingPosition = pos;
-    editForm = { isin: pos.isin, ticker: pos.ticker, name: pos.name, assetType: pos.assetType, quantity: pos.quantity, avgBuyPrice: pos.avgBuyPrice, currency: pos.currency, country: pos.country };
+    editForm = {
+      asset_type: pos.asset_type,
+      quantity: pos.quantity,
+      avg_buy_price: pos.avg_buy_price,
+      currency: pos.currency,
+      country: pos.country,
+    };
     showEditDialog = true;
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!editingPosition) return;
-    positions = positions.map((p) => p.id === editingPosition!.id ? { ...p, ...editForm } : p);
-    persist();
-    showEditDialog = false;
-    refreshQuotes();
-    toast.success("Position aktualisiert");
+    try {
+      await invoke("update_position", {
+        id: editingPosition.id,
+        input: editForm,
+      });
+      positions = positions.map((p) =>
+        p.id === editingPosition!.id ? { ...p, ...editForm } : p
+      );
+      showEditDialog = false;
+      refreshQuotes();
+      toast.success("Position aktualisiert");
+    } catch {
+      toast.error("Fehler beim Aktualisieren");
+    }
   }
 
-  function deletePosition(id: string) {
+  async function deletePosition(id: string) {
     if (!confirm("Position wirklich löschen?")) return;
-    positions = positions.filter((p) => p.id !== id);
-    persist();
-    toast.success("Position gelöscht");
+    try {
+      await invoke("delete_position", { id });
+      positions = positions.filter((p) => p.id !== id);
+      toast.success("Position gelöscht");
+    } catch {
+      toast.error("Fehler beim Löschen");
+    }
   }
 
   function fmt(value: number, currency = "EUR") {
@@ -176,10 +203,10 @@
     return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
   }
 
-  let totalInvested = $derived(positions.reduce((s, p) => s + p.quantity * p.avgBuyPrice, 0));
+  let totalInvested = $derived(positions.reduce((s, p) => s + p.quantity * p.avg_buy_price, 0));
   let totalCurrent = $derived(positions.reduce((s, p) => {
     const q = quotes[p.isin];
-    return s + p.quantity * (q ? q.price : p.avgBuyPrice);
+    return s + p.quantity * (q ? q.price : p.avg_buy_price);
   }, 0));
   let totalGain = $derived(totalCurrent - totalInvested);
   let totalGainPct = $derived(totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0);
@@ -187,7 +214,7 @@
   let countryAllocation = $derived(
     Object.entries(
       positions.reduce((map, p) => {
-        const val = p.quantity * (quotes[p.isin]?.price ?? p.avgBuyPrice);
+        const val = p.quantity * (quotes[p.isin]?.price ?? p.avg_buy_price);
         const c = p.country || "Unbekannt";
         map[c] = (map[c] ?? 0) + val;
         return map;
@@ -200,8 +227,8 @@
   let typeAllocation = $derived(
     Object.entries(
       positions.reduce((map, p) => {
-        const val = p.quantity * (quotes[p.isin]?.price ?? p.avgBuyPrice);
-        map[p.assetType] = (map[p.assetType] ?? 0) + val;
+        const val = p.quantity * (quotes[p.isin]?.price ?? p.avg_buy_price);
+        map[p.asset_type] = (map[p.asset_type] ?? 0) + val;
         return map;
       }, {} as Record<string, number>)
     )
@@ -279,8 +306,8 @@
             <tbody>
               {#each positions as pos}
                 {@const q = quotes[pos.isin]}
-                {@const curPrice = q?.price ?? pos.avgBuyPrice}
-                {@const invested = pos.quantity * pos.avgBuyPrice}
+                {@const curPrice = q?.price ?? pos.avg_buy_price}
+                {@const invested = pos.quantity * pos.avg_buy_price}
                 {@const current = pos.quantity * curPrice}
                 {@const gain = current - invested}
                 {@const gainPct = invested > 0 ? (gain / invested) * 100 : 0}
@@ -288,10 +315,10 @@
                   <td class="px-4 py-3 font-mono text-xs text-muted-foreground">{pos.isin}</td>
                   <td class="px-4 py-3 max-w-[150px] truncate font-medium">{q?.name || pos.name || pos.ticker}</td>
                   <td class="px-4 py-3">
-                    <Badge variant="secondary" class="text-xs">{assetTypes.find(t => t.value === pos.assetType)?.label}</Badge>
+                    <Badge variant="secondary" class="text-xs">{assetTypes.find(t => t.value === pos.asset_type)?.label}</Badge>
                   </td>
                   <td class="px-4 py-3 tabular-nums">{pos.quantity}</td>
-                  <td class="px-4 py-3 tabular-nums">{fmt(pos.avgBuyPrice, pos.currency)}</td>
+                  <td class="px-4 py-3 tabular-nums">{fmt(pos.avg_buy_price, pos.currency)}</td>
                   <td class="px-4 py-3 tabular-nums {!q ? 'text-muted-foreground' : ''}">{q ? fmt(q.price, q.currency) : "—"}</td>
                   <td class="px-4 py-3 tabular-nums font-medium">{fmt(current, pos.currency)}</td>
                   <td class="px-4 py-3 tabular-nums {gain >= 0 ? 'text-green-500' : 'text-destructive'}">
@@ -454,20 +481,14 @@
       <Dialog.Title>Position bearbeiten</Dialog.Title>
     </Dialog.Header>
     <div class="grid gap-4 py-2">
-      <div class="grid grid-cols-2 gap-3">
-        <div class="space-y-1.5">
-          <Label>ISIN</Label>
-          <Input bind:value={editForm.isin} class="font-mono uppercase" />
-        </div>
-        <div class="space-y-1.5">
-          <Label>Typ</Label>
-          <Select.Root type="single" bind:value={editForm.assetType}>
-            <Select.Trigger>{assetTypes.find(t => t.value === editForm.assetType)?.label}</Select.Trigger>
-            <Select.Content>
-              {#each assetTypes as t}<Select.Item value={t.value}>{t.label}</Select.Item>{/each}
-            </Select.Content>
-          </Select.Root>
-        </div>
+      <div class="space-y-1.5">
+        <Label>Typ</Label>
+        <Select.Root type="single" bind:value={editForm.asset_type}>
+          <Select.Trigger>{assetTypes.find(t => t.value === editForm.asset_type)?.label}</Select.Trigger>
+          <Select.Content>
+            {#each assetTypes as t}<Select.Item value={t.value}>{t.label}</Select.Item>{/each}
+          </Select.Content>
+        </Select.Root>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div class="space-y-1.5">
@@ -476,7 +497,7 @@
         </div>
         <div class="space-y-1.5">
           <Label>Ø Kaufpreis</Label>
-          <Input type="number" step="0.01" bind:value={editForm.avgBuyPrice} />
+          <Input type="number" step="0.01" bind:value={editForm.avg_buy_price} />
         </div>
         <div class="space-y-1.5">
           <Label>Währung</Label>

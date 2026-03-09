@@ -57,6 +57,10 @@ pub fn run() {
             commands::budget::get_budget_summary,
             commands::yahoo::resolve_isin,
             commands::yahoo::fetch_quotes,
+            commands::portfolio::get_positions,
+            commands::portfolio::create_position,
+            commands::portfolio::update_position,
+            commands::portfolio::delete_position,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
