@@ -58,6 +58,7 @@ pub fn run() {
             commands::yahoo::resolve_isin,
             commands::yahoo::fetch_quotes,
             commands::yahoo::fetch_fund_data,
+            commands::yahoo::fetch_history,
             commands::portfolio::get_positions,
             commands::portfolio::create_position,
             commands::portfolio::update_position,

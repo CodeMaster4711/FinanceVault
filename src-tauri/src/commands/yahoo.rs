@@ -59,6 +59,40 @@ struct YahooResult {
     regular_market_change_percent: Option<f64>,
 }
 
+// --- Yahoo v8 chart (history) response ---
+
+#[derive(Debug, Deserialize)]
+struct ChartEnvelope {
+    chart: ChartInner,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChartInner {
+    result: Option<Vec<ChartResult>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChartResult {
+    timestamp: Option<Vec<i64>>,
+    indicators: ChartIndicators,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChartIndicators {
+    quote: Option<Vec<ChartQuote>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChartQuote {
+    close: Option<Vec<Option<f64>>>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct PricePoint {
+    pub timestamp: i64,
+    pub close: f64,
+}
+
 // --- Yahoo quoteSummary topHoldings response ---
 
 #[derive(Debug, Deserialize)]
@@ -231,6 +265,57 @@ pub async fn fetch_quotes(
             })
         })
         .collect())
+}
+
+/// Fetch daily closing prices for a ticker. range: "1mo" | "3mo" | "6mo" | "1y" | "2y" | "5y"
+#[tauri::command]
+pub async fn fetch_history(
+    ticker: String,
+    range: String,
+    state: State<'_, VaultState>,
+) -> Result<Vec<PricePoint>> {
+    require_unlocked(&state)?;
+    let client = http_client()?;
+
+    let url = format!(
+        "https://query1.finance.yahoo.com/v8/finance/chart/{}?range={}&interval=1d&includePrePost=false",
+        ticker, range
+    );
+
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| VaultError::Crypto(format!("history network error: {e}")))?;
+
+    let body: ChartEnvelope = resp
+        .json()
+        .await
+        .map_err(|e| VaultError::Crypto(format!("history parse error: {e}")))?;
+
+    let result = body
+        .chart
+        .result
+        .and_then(|mut r| r.pop())
+        .ok_or_else(|| VaultError::Crypto(format!("no history for {ticker}")))?;
+
+    let timestamps = result.timestamp.unwrap_or_default();
+    let closes = result
+        .indicators
+        .quote
+        .and_then(|mut q| q.pop())
+        .and_then(|q| q.close)
+        .unwrap_or_default();
+
+    let points = timestamps
+        .into_iter()
+        .zip(closes.into_iter())
+        .filter_map(|(ts, close)| {
+            Some(PricePoint { timestamp: ts, close: close? })
+        })
+        .collect();
+
+    Ok(points)
 }
 
 /// Fetch top holdings and sector weights for a ticker via quoteSummary.

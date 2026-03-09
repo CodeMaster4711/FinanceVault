@@ -26,6 +26,11 @@ export interface FundData {
 	sector_weights: SectorWeight[];
 }
 
+export interface PricePoint {
+	timestamp: number;
+	close: number;
+}
+
 export const YahooService = {
 	resolveIsin: (isin: string) =>
 		invoke<[string, string]>('resolve_isin', { isin }),
@@ -35,4 +40,7 @@ export const YahooService = {
 
 	fetchFundData: (ticker: string) =>
 		invoke<FundData>('fetch_fund_data', { ticker }),
+
+	fetchHistory: (ticker: string, range: string) =>
+		invoke<PricePoint[]>('fetch_history', { ticker, range }),
 };

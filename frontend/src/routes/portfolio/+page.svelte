@@ -10,7 +10,9 @@
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
   import { toast } from "svelte-sonner";
-  import { YahooService, type Quote, type FundData } from "$lib/services/yahoo";
+  import { scaleTime, scaleLinear } from "d3-scale";
+  import { Chart, Area, Spline, Axis, LinearGradient, ChartClipPath } from "layerchart";
+  import { YahooService, type Quote, type FundData, type PricePoint } from "$lib/services/yahoo";
   import TrendingUpIcon from "@lucide/svelte/icons/trending-up";
   import TrendingDownIcon from "@lucide/svelte/icons/trending-down";
   import PlusIcon from "@lucide/svelte/icons/plus";
@@ -35,6 +37,20 @@
     created_at: string;
   }
 
+  interface ChartPoint {
+    date: Date;
+    value: number;
+  }
+
+  const ranges = [
+    { value: "1mo", label: "1M" },
+    { value: "3mo", label: "3M" },
+    { value: "6mo", label: "6M" },
+    { value: "1y",  label: "1J" },
+    { value: "2y",  label: "2J" },
+    { value: "5y",  label: "5J" },
+  ];
+
   let positions: Position[] = $state([]);
   let quotes: Record<string, Quote> = $state({});
   let loadingQuotes = $state(false);
@@ -45,6 +61,11 @@
   let fundData: FundData | null = $state(null);
   let fundDataLoading = $state(false);
   let fundDataTicker = $state("");
+
+  // Chart state
+  let chartRange = $state("1y");
+  let chartData: ChartPoint[] = $state([]);
+  let chartLoading = $state(false);
 
   // Add form
   let isinInput = $state("");
@@ -75,7 +96,10 @@
 
   onMount(async () => {
     await loadPositions();
-    if (positions.length > 0) refreshQuotes();
+    if (positions.length > 0) {
+      await refreshQuotes();
+      await buildChart();
+    }
   });
 
   async function loadPositions() {
@@ -99,6 +123,53 @@
       toast.error("Kurse konnten nicht geladen werden");
     } finally {
       loadingQuotes = false;
+    }
+  }
+
+  async function buildChart() {
+    if (positions.length === 0) return;
+    chartLoading = true;
+    try {
+      const histories = await Promise.all(
+        positions.map((p) =>
+          YahooService.fetchHistory(p.ticker, chartRange)
+            .then((pts) => ({ ticker: p.ticker, isin: p.isin, quantity: p.quantity, pts }))
+            .catch(() => ({ ticker: p.ticker, isin: p.isin, quantity: p.quantity, pts: [] as PricePoint[] }))
+        )
+      );
+
+      // Collect all unique timestamps
+      const tsSet = new Set<number>();
+      histories.forEach(({ pts }) => pts.forEach((p) => tsSet.add(p.timestamp)));
+      const timestamps = Array.from(tsSet).sort((a, b) => a - b);
+
+      // Build lookup: ticker → timestamp → close
+      const lookup = new Map<string, Map<number, number>>();
+      histories.forEach(({ ticker, pts }) => {
+        const m = new Map<number, number>();
+        pts.forEach((p) => m.set(p.timestamp, p.close));
+        lookup.set(ticker, m);
+      });
+
+      // For each timestamp: sum quantity * close across all positions
+      const points: ChartPoint[] = [];
+      for (const ts of timestamps) {
+        let value = 0;
+        let allPresent = true;
+        for (const { ticker, quantity } of histories) {
+          const close = lookup.get(ticker)?.get(ts);
+          if (close === undefined) { allPresent = false; break; }
+          value += quantity * close;
+        }
+        if (allPresent) {
+          points.push({ date: new Date(ts * 1000), value });
+        }
+      }
+      chartData = points;
+    } catch {
+      chartData = [];
+    } finally {
+      chartLoading = false;
     }
   }
 
@@ -321,6 +392,75 @@
         </Card.Root>
       {/each}
     </div>
+
+    <!-- Portfolio Chart -->
+    <Card.Root>
+      <Card.Header class="flex flex-row items-center justify-between pb-2">
+        <div>
+          <Card.Title class="text-sm font-medium">Gesamtportfolio</Card.Title>
+          {#if chartData.length > 0}
+            {@const first = chartData[0].value}
+            {@const last = chartData[chartData.length - 1].value}
+            {@const diff = last - first}
+            {@const diffPct = first > 0 ? (diff / first) * 100 : 0}
+            <Card.Description class="{diff >= 0 ? 'text-green-500' : 'text-destructive'} font-medium text-xs mt-0.5">
+              {diff >= 0 ? "+" : ""}{fmt(diff)} ({diff >= 0 ? "+" : ""}{diffPct.toFixed(2)}%)
+            </Card.Description>
+          {/if}
+        </div>
+        <div class="flex gap-1">
+          {#each ranges as r}
+            <Button
+              variant={chartRange === r.value ? "default" : "ghost"}
+              size="sm"
+              class="h-7 px-2 text-xs"
+              onclick={async () => { chartRange = r.value; await buildChart(); }}
+            >{r.label}</Button>
+          {/each}
+        </div>
+      </Card.Header>
+      <Card.Content class="px-4 pb-4">
+        {#if chartLoading}
+          <div class="flex items-center justify-center h-52">
+            <LoaderIcon class="size-5 animate-spin text-muted-foreground" />
+          </div>
+        {:else if chartData.length > 1}
+          {@const isPositive = chartData[chartData.length - 1].value >= chartData[0].value}
+          <div class="h-52">
+            <Chart
+              data={chartData}
+              x="date"
+              xScale={scaleTime()}
+              y="value"
+              yScale={scaleLinear()}
+              yNice
+              padding={{ left: 56, bottom: 24, right: 8, top: 8 }}
+            >
+              {#snippet children()}
+                <defs>
+                  <LinearGradient id="chartGrad" vertical>
+                    {#snippet stopsContent()}
+                      <stop offset="0%" stop-color={isPositive ? "hsl(142 76% 36%)" : "hsl(0 72% 51%)"} stop-opacity="0.3" />
+                      <stop offset="100%" stop-color={isPositive ? "hsl(142 76% 36%)" : "hsl(0 72% 51%)"} stop-opacity="0" />
+                    {/snippet}
+                  </LinearGradient>
+                </defs>
+                <ChartClipPath>
+                  <Area fill="url(#chartGrad)" />
+                  <Spline stroke={isPositive ? "hsl(142 76% 36%)" : "hsl(0 72% 51%)"} strokeWidth={1.5} />
+                </ChartClipPath>
+                <Axis placement="left" format={(v: number) => fmt(v)} ticks={4} />
+                <Axis placement="bottom" format={(d: Date) => d.toLocaleDateString("de-DE", { month: "short", day: "numeric" })} ticks={5} />
+              {/snippet}
+            </Chart>
+          </div>
+        {:else}
+          <div class="flex items-center justify-center h-52 text-sm text-muted-foreground">
+            Keine historischen Daten verfügbar.
+          </div>
+        {/if}
+      </Card.Content>
+    </Card.Root>
 
     <!-- Positions -->
     <Card.Root>
