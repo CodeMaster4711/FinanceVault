@@ -1,66 +1,50 @@
 <script lang="ts">
   import "../app.css";
   import favicon from "$lib/assets/favicon.svg";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import AppSidebar from "$lib/components/navbar/app-sidebar.svelte";
-  import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
-  import { Separator } from "$lib/components/ui/separator/index.js";
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-  import {
-    theme,
-    effectiveTheme,
-    initThemeFromStorage,
-  } from "$lib/stores/theme";
+  import { effectiveTheme, initThemeFromStorage } from "$lib/stores/theme";
   import { page } from "$app/stores";
-  import { authStore } from "$lib/stores/auth";
-  import { ApiClient } from "$lib/services/api-client";
+  import { vault } from "$lib/stores/vault";
+  import VaultGate from "$lib/components/vault/vault-gate.svelte";
 
-  let { data, children } = $props();
+  let { children } = $props();
 
-  // Check if we should show the sidebar (not on signin/signup pages)
   let showSidebar = $derived(
-    !$page.url.pathname.startsWith("/signin") &&
+    $vault.status === "unlocked" &&
+      !$page.url.pathname.startsWith("/signin") &&
       !$page.url.pathname.startsWith("/signup")
   );
 
-  // On the client we initialize the store from localStorage and
-  // subscribe to the effective theme to keep the <html> class in sync.
   onMount(() => {
-    console.log('[+layout.svelte] Component mounted.');
-    console.log('[+layout.svelte] Data received from load function:', data);
-    // Initialize auth store with user from server
-    authStore.init(data.user, data.token);
-
-    // Initialize theme
+    vault.init();
     initThemeFromStorage();
 
     const unsub = effectiveTheme.subscribe((t) => {
-      try {
-        if (t === "dark") document.documentElement.classList.add("dark");
-        else document.documentElement.classList.remove("dark");
-        // reflect chosen preference for debugging/other CSS
-        try {
-          document.documentElement.setAttribute(
-            "data-theme",
-            t === "dark" ? "dark" : "light"
-          );
-        } catch (e) {}
-      } catch (e) {
-        // ignore
-      }
+      if (t === "dark") document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
+      document.documentElement.setAttribute(
+        "data-theme",
+        t === "dark" ? "dark" : "light"
+      );
     });
 
     return unsub;
   });
-
-  
 </script>
 
 <svelte:head>
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-{#if showSidebar}
+{#if $vault.status === "checking"}
+  <div class="flex h-screen items-center justify-center bg-background">
+    <span class="text-muted-foreground text-sm">Loading...</span>
+  </div>
+{:else if $vault.status === "uninitialized" || $vault.status === "locked"}
+  <VaultGate />
+{:else if showSidebar}
   <Sidebar.Provider>
     <AppSidebar />
     <Sidebar.Inset>
@@ -70,6 +54,5 @@
     </Sidebar.Inset>
   </Sidebar.Provider>
 {:else}
-  <!-- Content without sidebar for signin/signup pages -->
   {@render children?.()}
 {/if}

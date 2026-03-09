@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::State;
+use totp_rs::{Algorithm, Secret, TOTP};
 
-use crate::crypto::{derive_key, generate_salt_b64, encrypt, decrypt, DerivedKey};
+use crate::commands::totp::{load_totp_state, TotpState};
+use crate::crypto::{decrypt, derive_key, encrypt, generate_salt_b64, DerivedKey};
 use crate::db;
 use crate::error::{Result, VaultError};
 
@@ -12,13 +14,19 @@ pub struct VaultState {
 }
 
 fn meta_get(conn: &rusqlite::Connection, key: &str) -> rusqlite::Result<Option<String>> {
-    let mut stmt = conn.prepare("SELECT value FROM vault_meta WHERE key = ?1")?;
-    let mut rows = stmt.query([key])?;
-    if let Some(row) = rows.next()? {
-        Ok(Some(row.get(0)?))
-    } else {
-        Ok(None)
-    }
+    conn.query_row(
+        "SELECT value FROM vault_meta WHERE key = ?1",
+        [key],
+        |row| row.get::<_, String>(0),
+    )
+    .map(Some)
+    .or_else(|e| {
+        if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
+            Ok(None)
+        } else {
+            Err(e)
+        }
+    })
 }
 
 fn meta_set(conn: &rusqlite::Connection, key: &str, value: &str) -> rusqlite::Result<()> {
@@ -61,17 +69,20 @@ pub fn setup_vault(passphrase: String, state: State<'_, VaultState>) -> Result<(
 }
 
 #[tauri::command]
-pub fn unlock(passphrase: String, state: State<'_, VaultState>) -> Result<()> {
+pub fn unlock(
+    passphrase: String,
+    totp_code: Option<String>,
+    state: State<'_, VaultState>,
+    totp_state: State<'_, TotpState>,
+) -> Result<()> {
     if !state.db_path.exists() {
         return Err(VaultError::NotInitialized);
     }
 
     let conn = db::open(&state.db_path)?;
 
-    let salt = meta_get(&conn, "salt")?
-        .ok_or(VaultError::NotInitialized)?;
-    let canary = meta_get(&conn, "canary")?
-        .ok_or(VaultError::NotInitialized)?;
+    let salt = meta_get(&conn, "salt")?.ok_or(VaultError::NotInitialized)?;
+    let canary = meta_get(&conn, "canary")?.ok_or(VaultError::NotInitialized)?;
 
     let key = derive_key(&passphrase, &salt)?;
     let plaintext = decrypt(&key, &canary)?;
@@ -80,12 +91,41 @@ pub fn unlock(passphrase: String, state: State<'_, VaultState>) -> Result<()> {
         return Err(VaultError::InvalidPassphrase);
     }
 
+    let (totp_enabled, totp_secret) = load_totp_state(&conn, &key)?;
+    if totp_enabled {
+        let secret = totp_secret.ok_or(VaultError::InvalidTotp)?;
+        let code = totp_code.ok_or(VaultError::InvalidTotp)?;
+
+        let bytes = Secret::Encoded(secret.clone())
+            .to_bytes()
+            .map_err(|e| VaultError::Crypto(e.to_string()))?;
+        let totp = TOTP::new(
+            Algorithm::SHA1,
+            6,
+            1,
+            30,
+            bytes,
+            Some("FinanceVault".to_string()),
+            "FinanceVault".to_string(),
+        )
+        .map_err(|e| VaultError::Crypto(e.to_string()))?;
+
+        if !totp.check_current(&code).unwrap_or(false) {
+            return Err(VaultError::InvalidTotp);
+        }
+
+        *totp_state.enabled.lock().unwrap() = true;
+        *totp_state.secret.lock().unwrap() = Some(secret);
+    }
+
     *state.key.lock().unwrap() = Some(key);
     Ok(())
 }
 
 #[tauri::command]
-pub fn lock(state: State<'_, VaultState>) -> Result<()> {
+pub fn lock(state: State<'_, VaultState>, totp_state: State<'_, TotpState>) -> Result<()> {
     *state.key.lock().unwrap() = None;
+    *totp_state.secret.lock().unwrap() = None;
+    *totp_state.enabled.lock().unwrap() = false;
     Ok(())
 }

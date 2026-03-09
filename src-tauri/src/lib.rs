@@ -6,6 +6,7 @@ mod error;
 use std::sync::Mutex;
 use tauri::Manager;
 use commands::auth::VaultState;
+use commands::totp::TotpState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,6 +24,10 @@ pub fn run() {
                 key: Mutex::new(None),
                 db_path,
             });
+            app.manage(TotpState {
+                enabled: Mutex::new(false),
+                secret: Mutex::new(None),
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -31,6 +36,12 @@ pub fn run() {
             commands::auth::is_locked,
             commands::auth::setup_vault,
             commands::auth::vault_exists,
+            commands::totp::totp_generate_secret,
+            commands::totp::totp_get_qr_base64,
+            commands::totp::totp_get_url,
+            commands::totp::totp_verify,
+            commands::totp::totp_enable,
+            commands::totp::totp_is_enabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
