@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export interface Quote {
+	isin: string;
 	ticker: string;
 	name: string;
 	price: number;
@@ -9,6 +10,9 @@ export interface Quote {
 }
 
 export const YahooService = {
-	fetchQuotes: (tickers: string[]) =>
-		invoke<Quote[]>('fetch_quotes', { tickers }),
+	resolveIsin: (isin: string) =>
+		invoke<[string, string]>('resolve_isin', { isin }),
+
+	fetchQuotes: (positions: [string, string][]) =>
+		invoke<Quote[]>('fetch_quotes', { positions }),
 };

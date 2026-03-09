@@ -55,6 +55,7 @@ pub fn run() {
             commands::budget::get_budget_months,
             commands::budget::upsert_budget_month,
             commands::budget::get_budget_summary,
+            commands::yahoo::resolve_isin,
             commands::yahoo::fetch_quotes,
         ])
         .run(tauri::generate_context!())
