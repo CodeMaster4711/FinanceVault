@@ -55,6 +55,11 @@
         icon: RepeatIcon,
       },
       {
+        title: "Budget",
+        url: "/budget",
+        icon: PiggyBankIcon,
+      },
+      {
         title: "Reports",
         url: "/reports",
         icon: ChartPieIcon,

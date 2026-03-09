@@ -51,6 +51,9 @@ pub fn run() {
             commands::subscriptions::create_subscription,
             commands::subscriptions::update_subscription,
             commands::subscriptions::delete_subscription,
+            commands::budget::get_budget_months,
+            commands::budget::upsert_budget_month,
+            commands::budget::get_budget_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
