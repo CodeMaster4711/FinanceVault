@@ -57,6 +57,7 @@ pub fn run() {
             commands::budget::get_budget_summary,
             commands::yahoo::resolve_isin,
             commands::yahoo::fetch_quotes,
+            commands::yahoo::fetch_fund_data,
             commands::portfolio::get_positions,
             commands::portfolio::create_position,
             commands::portfolio::update_position,

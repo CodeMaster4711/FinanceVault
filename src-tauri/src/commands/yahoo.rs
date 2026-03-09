@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -55,6 +57,77 @@ struct YahooResult {
     currency: Option<String>,
     #[serde(rename = "regularMarketChangePercent")]
     regular_market_change_percent: Option<f64>,
+}
+
+// --- Yahoo quoteSummary topHoldings response ---
+
+#[derive(Debug, Deserialize)]
+struct QuoteSummaryEnvelope {
+    #[serde(rename = "quoteSummary")]
+    quote_summary: QuoteSummaryInner,
+}
+
+#[derive(Debug, Deserialize)]
+struct QuoteSummaryInner {
+    result: Option<Vec<QuoteSummaryResult>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct QuoteSummaryResult {
+    #[serde(rename = "topHoldings")]
+    top_holdings: Option<TopHoldingsRaw>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TopHoldingsRaw {
+    holdings: Option<Vec<HoldingRaw>>,
+    #[serde(rename = "sectorWeightings", default)]
+    sector_weightings: Vec<HashMap<String, serde_json::Value>>,
+    #[serde(rename = "equityHoldings")]
+    equity_holdings: Option<EquityHoldingsRaw>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HoldingRaw {
+    symbol: Option<String>,
+    #[serde(rename = "holdingName")]
+    holding_name: Option<String>,
+    #[serde(rename = "holdingPercent")]
+    holding_percent: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct EquityHoldingsRaw {
+    #[serde(rename = "priceToEarnings")]
+    price_to_earnings: Option<f64>,
+    #[serde(rename = "priceToBook")]
+    price_to_book: Option<f64>,
+    #[serde(rename = "priceToSales")]
+    price_to_sales: Option<f64>,
+    #[serde(rename = "priceToCashflow")]
+    price_to_cashflow: Option<f64>,
+}
+
+// --- Public output types ---
+
+#[derive(Debug, Serialize, Clone)]
+pub struct FundHolding {
+    pub symbol: String,
+    pub name: String,
+    pub percent: f64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct SectorWeight {
+    pub sector: String,
+    pub percent: f64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct FundData {
+    pub ticker: String,
+    pub holdings: Vec<FundHolding>,
+    pub sector_weights: Vec<SectorWeight>,
 }
 
 fn require_unlocked(state: &VaultState) -> Result<()> {
@@ -158,4 +231,66 @@ pub async fn fetch_quotes(
             })
         })
         .collect())
+}
+
+/// Fetch top holdings and sector weights for a ticker via quoteSummary.
+#[tauri::command]
+pub async fn fetch_fund_data(
+    ticker: String,
+    state: State<'_, VaultState>,
+) -> Result<FundData> {
+    require_unlocked(&state)?;
+    let client = http_client()?;
+
+    let url = format!(
+        "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{}?modules=topHoldings",
+        ticker
+    );
+
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| VaultError::Crypto(format!("fund data network error: {e}")))?;
+
+    let body: QuoteSummaryEnvelope = resp
+        .json()
+        .await
+        .map_err(|e| VaultError::Crypto(format!("fund data parse error: {e}")))?;
+
+    let top = body
+        .quote_summary
+        .result
+        .and_then(|mut r| r.pop())
+        .and_then(|r| r.top_holdings)
+        .ok_or_else(|| VaultError::Crypto(format!("no fund data for {ticker}")))?;
+
+    let holdings = top
+        .holdings
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|h| {
+            Some(FundHolding {
+                symbol: h.symbol.unwrap_or_default(),
+                name: h.holding_name.unwrap_or_default(),
+                percent: h.holding_percent?,
+            })
+        })
+        .collect();
+
+    let sector_weights = top
+        .sector_weightings
+        .into_iter()
+        .flat_map(|map| {
+            map.into_iter().filter_map(|(k, v)| {
+                let pct = v.as_f64()?;
+                if pct == 0.0 {
+                    return None;
+                }
+                Some(SectorWeight { sector: k, percent: pct })
+            })
+        })
+        .collect();
+
+    Ok(FundData { ticker, holdings, sector_weights })
 }

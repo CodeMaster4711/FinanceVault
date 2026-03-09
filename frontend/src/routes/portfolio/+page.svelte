@@ -10,7 +10,7 @@
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
   import { toast } from "svelte-sonner";
-  import { YahooService, type Quote } from "$lib/services/yahoo";
+  import { YahooService, type Quote, type FundData } from "$lib/services/yahoo";
   import TrendingUpIcon from "@lucide/svelte/icons/trending-up";
   import TrendingDownIcon from "@lucide/svelte/icons/trending-down";
   import PlusIcon from "@lucide/svelte/icons/plus";
@@ -20,6 +20,7 @@
   import SearchIcon from "@lucide/svelte/icons/search";
   import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
   import LoaderIcon from "@lucide/svelte/icons/loader";
+  import BarChart2Icon from "@lucide/svelte/icons/bar-chart-2";
 
   interface Position {
     id: string;
@@ -40,6 +41,10 @@
   let showAddDialog = $state(false);
   let showEditDialog = $state(false);
   let editingPosition: Position | null = $state(null);
+  let showFundDialog = $state(false);
+  let fundData: FundData | null = $state(null);
+  let fundDataLoading = $state(false);
+  let fundDataTicker = $state("");
 
   // Add form
   let isinInput = $state("");
@@ -195,6 +200,35 @@
     }
   }
 
+  async function openFundData(ticker: string) {
+    fundDataTicker = ticker;
+    fundData = null;
+    fundDataLoading = true;
+    showFundDialog = true;
+    try {
+      fundData = await YahooService.fetchFundData(ticker);
+    } catch {
+      toast.error(`Keine Fund-Daten für ${ticker} verfügbar`);
+      showFundDialog = false;
+    } finally {
+      fundDataLoading = false;
+    }
+  }
+
+  const sectorLabels: Record<string, string> = {
+    technology: "Technologie",
+    financial_services: "Finanzen",
+    healthcare: "Gesundheit",
+    consumer_cyclical: "Konsum (zyklisch)",
+    consumer_defensive: "Konsum (defensiv)",
+    industrials: "Industrie",
+    communication_services: "Kommunikation",
+    energy: "Energie",
+    basic_materials: "Rohstoffe",
+    utilities: "Versorger",
+    realestate: "Immobilien",
+  };
+
   function fmt(value: number, currency = "EUR") {
     return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(value);
   }
@@ -298,7 +332,7 @@
           <table class="w-full text-sm">
             <thead class="border-b bg-muted/40">
               <tr>
-                {#each ["ISIN", "Name", "Typ", "Anzahl", "Ø Kauf", "Kurs", "Wert", "G/V", "1T", ""] as h}
+                {#each ["ISIN", "Name", "Typ", "Anzahl", "Ø Kauf", "Kurs", "Wert", "Anteil", "G/V", "1T", ""] as h}
                   <th class="h-10 px-4 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
                 {/each}
               </tr>
@@ -311,6 +345,7 @@
                 {@const current = pos.quantity * curPrice}
                 {@const gain = current - invested}
                 {@const gainPct = invested > 0 ? (gain / invested) * 100 : 0}
+                {@const portfolioPct = totalCurrent > 0 ? (current / totalCurrent) * 100 : 0}
                 <tr class="border-b last:border-0 hover:bg-muted/30 transition-colors">
                   <td class="px-4 py-3 font-mono text-xs text-muted-foreground">{pos.isin}</td>
                   <td class="px-4 py-3 max-w-[150px] truncate font-medium">{q?.name || pos.name || pos.ticker}</td>
@@ -321,6 +356,14 @@
                   <td class="px-4 py-3 tabular-nums">{fmt(pos.avg_buy_price, pos.currency)}</td>
                   <td class="px-4 py-3 tabular-nums {!q ? 'text-muted-foreground' : ''}">{q ? fmt(q.price, q.currency) : "—"}</td>
                   <td class="px-4 py-3 tabular-nums font-medium">{fmt(current, pos.currency)}</td>
+                  <td class="px-4 py-3 min-w-[90px]">
+                    <div class="flex items-center gap-1.5">
+                      <div class="h-1 w-14 rounded-full bg-muted overflow-hidden">
+                        <div class="h-full rounded-full bg-primary transition-all" style="width: {portfolioPct}%"></div>
+                      </div>
+                      <span class="tabular-nums text-xs text-muted-foreground">{portfolioPct.toFixed(1)}%</span>
+                    </div>
+                  </td>
                   <td class="px-4 py-3 tabular-nums {gain >= 0 ? 'text-green-500' : 'text-destructive'}">
                     {fmt(gain, pos.currency)}<br/><span class="text-xs">{fmtPct(gainPct)}</span>
                   </td>
@@ -329,6 +372,9 @@
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex gap-1">
+                      <Button variant="ghost" size="icon" class="size-7" onclick={() => openFundData(pos.ticker)} title="Holdings & Sektoren">
+                        <BarChart2Icon class="size-3.5" />
+                      </Button>
                       <Button variant="ghost" size="icon" class="size-7" onclick={() => openEdit(pos)}>
                         <PencilIcon class="size-3.5" />
                       </Button>
@@ -512,6 +558,74 @@
     <Dialog.Footer>
       <Button variant="outline" onclick={() => (showEditDialog = false)}>Abbrechen</Button>
       <Button onclick={saveEdit}>Speichern</Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
+
+<!-- Fund Data Dialog -->
+<Dialog.Root bind:open={showFundDialog}>
+  <Dialog.Content class="max-w-lg">
+    <Dialog.Header>
+      <Dialog.Title>{fundDataTicker} — Holdings & Sektoren</Dialog.Title>
+      <Dialog.Description>Daten via Yahoo Finance · keine Daten werden hochgeladen</Dialog.Description>
+    </Dialog.Header>
+
+    {#if fundDataLoading}
+      <div class="flex items-center justify-center h-32">
+        <LoaderIcon class="size-5 animate-spin text-muted-foreground" />
+      </div>
+    {:else if fundData}
+      <div class="space-y-5 py-2 max-h-[60vh] overflow-y-auto pr-1">
+
+        {#if fundData.holdings.length > 0}
+          <div class="space-y-2">
+            <p class="text-sm font-medium">Top Holdings</p>
+            {#each fundData.holdings as h}
+              {@const pct = h.percent * 100}
+              <div class="space-y-1">
+                <div class="flex justify-between text-sm">
+                  <span class="truncate max-w-[260px]">{h.name || h.symbol}</span>
+                  <span class="tabular-nums text-muted-foreground shrink-0 ml-2">{pct.toFixed(2)}%</span>
+                </div>
+                <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div class="h-full rounded-full bg-primary transition-all" style="width: {Math.min(pct * 3, 100)}%"></div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+
+        {#if fundData.holdings.length > 0 && fundData.sector_weights.length > 0}
+          <Separator />
+        {/if}
+
+        {#if fundData.sector_weights.length > 0}
+          {@const maxSector = Math.max(...fundData.sector_weights.map(s => s.percent))}
+          <div class="space-y-2">
+            <p class="text-sm font-medium">Sektorgewichtung</p>
+            {#each fundData.sector_weights.sort((a, b) => b.percent - a.percent) as s}
+              {@const pct = s.percent * 100}
+              <div class="space-y-1">
+                <div class="flex justify-between text-sm">
+                  <span>{sectorLabels[s.sector] ?? s.sector}</span>
+                  <span class="tabular-nums text-muted-foreground">{pct.toFixed(2)}%</span>
+                </div>
+                <div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div class="h-full rounded-full bg-blue-500 transition-all" style="width: {maxSector > 0 ? (s.percent / maxSector) * 100 : 0}%"></div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+
+        {#if fundData.holdings.length === 0 && fundData.sector_weights.length === 0}
+          <p class="text-sm text-muted-foreground text-center py-4">Keine Daten verfügbar.</p>
+        {/if}
+      </div>
+    {/if}
+
+    <Dialog.Footer>
+      <Button variant="outline" onclick={() => (showFundDialog = false)}>Schließen</Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>

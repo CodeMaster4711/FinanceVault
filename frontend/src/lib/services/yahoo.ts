@@ -9,10 +9,30 @@ export interface Quote {
 	change_pct: number;
 }
 
+export interface FundHolding {
+	symbol: string;
+	name: string;
+	percent: number;
+}
+
+export interface SectorWeight {
+	sector: string;
+	percent: number;
+}
+
+export interface FundData {
+	ticker: string;
+	holdings: FundHolding[];
+	sector_weights: SectorWeight[];
+}
+
 export const YahooService = {
 	resolveIsin: (isin: string) =>
 		invoke<[string, string]>('resolve_isin', { isin }),
 
 	fetchQuotes: (positions: [string, string][]) =>
 		invoke<Quote[]>('fetch_quotes', { positions }),
+
+	fetchFundData: (ticker: string) =>
+		invoke<FundData>('fetch_fund_data', { ticker }),
 };
