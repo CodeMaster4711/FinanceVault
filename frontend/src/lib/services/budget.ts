@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 export interface BudgetMonth {
 	id: string;
 	month: string;
-	income: f64;
+	income: number;
 	created_at: string;
 }
 
@@ -14,8 +14,6 @@ export interface BudgetSummary {
 	total_subscriptions_monthly: number;
 	remaining: number;
 }
-
-type f64 = number;
 
 export const BudgetService = {
 	getMonths: () => invoke<BudgetMonth[]>('get_budget_months'),

@@ -1,0 +1,12 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/schema/capabilities/desktop.json",
+  "identifier": "default",
+  "description": "Default capabilities for FinanceVault",
+  "platforms": ["linux", "macOS", "windows"],
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:allow-open",
+    "http:default"
+  ]
+}

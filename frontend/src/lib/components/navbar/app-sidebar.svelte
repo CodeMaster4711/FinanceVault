@@ -60,6 +60,11 @@
         icon: PiggyBankIcon,
       },
       {
+        title: "Portfolio",
+        url: "/portfolio",
+        icon: TrendingUpIcon,
+      },
+      {
         title: "Reports",
         url: "/reports",
         icon: ChartPieIcon,

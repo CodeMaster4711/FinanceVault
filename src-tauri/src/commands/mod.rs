@@ -3,3 +3,4 @@ pub mod budget;
 pub mod expenses;
 pub mod subscriptions;
 pub mod totp;
+pub mod yahoo;
